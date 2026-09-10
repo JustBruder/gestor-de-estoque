@@ -1,5 +1,6 @@
 package com.gestor.estoque.controller;
 
+import com.gestor.estoque.dto.BebidaDTO;
 import com.gestor.estoque.model.Bebida;
 import com.gestor.estoque.model.Usuario;
 import com.gestor.estoque.repository.BebidaRepository;
@@ -41,12 +42,16 @@ public class BebidaController {
     }
 
     @PostMapping
-    public ResponseEntity<Object> criar(@RequestBody Bebida bebida, Authentication authentication) {
+    public ResponseEntity<Object> criar(@RequestBody BebidaDTO dto, Authentication authentication) {
         Usuario usuario = usuarioRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new IllegalArgumentException(ERRO_USUARIO_NAO_ENCONTRADO));
 
-        bebida.setId(null); // Proteção contra Overposting
+        Bebida bebida = new Bebida();
+        bebida.setNome(dto.nome().trim());
+        bebida.setPreco(dto.preco());
+        bebida.setQuantidadeEstoque(dto.quantidadeEstoque());
         bebida.setUsuario(usuario);
+
         Bebida salva = bebidaRepository.save(bebida);
         return ResponseEntity.ok(salva);
     }
