@@ -6,14 +6,24 @@ import com.gestor.estoque.repository.IngredienteRepository;
 import com.gestor.estoque.repository.UsuarioRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/ingredientes")
-@CrossOrigin(origins = "*")
+@CrossOrigin(origins = "https://conferindoestoque.vercel.app")
 public class IngredienteController {
+
+    private static final String ERRO_USUARIO_NAO_ENCONTRADO = "Usuário não encontrado.";
+    private static final String ERRO_INGRED_NAO_ENCONTRADO = "Ingrediente não encontrado.";
 
     private final IngredienteRepository ingredienteRepository;
     private final UsuarioRepository usuarioRepository;
@@ -24,70 +34,54 @@ public class IngredienteController {
     }
 
     @GetMapping
-    public ResponseEntity<?> listar(Authentication authentication) {
+    public ResponseEntity<Iterable<Ingrediente>> listar(Authentication authentication) {
         Usuario usuario = usuarioRepository.findByEmail(authentication.getName())
-                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado."));
+                .orElseThrow(() -> new IllegalArgumentException(ERRO_USUARIO_NAO_ENCONTRADO));
         return ResponseEntity.ok(ingredienteRepository.findByUsuarioId(usuario.getId()));
     }
 
     @PostMapping
-    public ResponseEntity<?> criar(@RequestBody Map<String, Object> body, Authentication authentication) {
-        try {
-            Usuario usuario = usuarioRepository.findByEmail(authentication.getName())
-                    .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado."));
+    public ResponseEntity<Object> criar(@RequestBody Ingrediente ingrediente, Authentication authentication) {
+        Usuario usuario = usuarioRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new IllegalArgumentException(ERRO_USUARIO_NAO_ENCONTRADO));
 
-            String nome = body.get("nome").toString().trim();
-            Double quantidadeEstoque = Double.valueOf(body.get("quantidadeEstoque").toString());
-            String unidadeMedida = body.get("unidadeMedida").toString().trim();
-
-            Ingrediente ingrediente = new Ingrediente();
-            ingrediente.setNome(nome);
-            ingrediente.setQuantidadeEstoque(quantidadeEstoque);
-            ingrediente.setUnidadeMedida(unidadeMedida);
-            ingrediente.setUsuario(usuario);
-
-            Ingrediente salvo = ingredienteRepository.save(ingrediente);
-            return ResponseEntity.ok(salvo);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("erro", "Erro ao cadastrar ingrediente: " + e.getMessage()));
-        }
+        ingrediente.setId(null); // Proteção contra Overposting
+        ingrediente.setUsuario(usuario);
+        Ingrediente salvo = ingredienteRepository.save(ingrediente);
+        return ResponseEntity.ok(salvo);
     }
 
     @PostMapping("/{id}/acrescimo")
-    public ResponseEntity<?> darBaixaAcrescimo(@PathVariable Long id, @RequestBody Map<String, Object> body, Authentication authentication) {
-        try {
-            Usuario usuario = usuarioRepository.findByEmail(authentication.getName())
-                    .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado."));
-
-            var ingOpt = ingredienteRepository.findById(id);
-            if (ingOpt.isEmpty() || !ingOpt.get().getUsuario().getId().equals(usuario.getId())) {
-                return ResponseEntity.badRequest().body(Map.of("erro", "Ingrediente não encontrado."));
-            }
-
-            Ingrediente ingrediente = ingOpt.get();
-            Double quantidadeAbater = body.containsKey("quantidade") ? Double.valueOf(body.get("quantidade").toString()) : 1.0;
-
-            if (ingrediente.getQuantidadeEstoque() < quantidadeAbater) {
-                return ResponseEntity.badRequest().body(Map.of("erro", "Estoque insuficiente para abate."));
-            }
-
-            ingrediente.setQuantidadeEstoque(ingrediente.getQuantidadeEstoque() - quantidadeAbater);
-            ingredienteRepository.save(ingrediente);
-
-            return ResponseEntity.ok(Map.of("mensagem", "Baixa de " + quantidadeAbater + " " + ingrediente.getUnidadeMedida() + " realizada!"));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("erro", "Erro ao dar baixa em acréscimo: " + e.getMessage()));
-        }
-    }
-
-    @DeleteMapping("/{id}")
-    public ResponseEntity<?> excluir(@PathVariable Long id, Authentication authentication) {
+    public ResponseEntity<Object> darBaixaAcrescimo(@PathVariable Long id, @RequestBody Map<String, Object> body, Authentication authentication) {
         Usuario usuario = usuarioRepository.findByEmail(authentication.getName())
-                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado."));
+                .orElseThrow(() -> new IllegalArgumentException(ERRO_USUARIO_NAO_ENCONTRADO));
 
         var ingOpt = ingredienteRepository.findById(id);
         if (ingOpt.isEmpty() || !ingOpt.get().getUsuario().getId().equals(usuario.getId())) {
-            return ResponseEntity.badRequest().body(Map.of("erro", "Ingrediente não encontrado."));
+            return ResponseEntity.badRequest().body(Map.of("erro", ERRO_INGRED_NAO_ENCONTRADO));
+        }
+
+        Ingrediente ingrediente = ingOpt.get();
+        Double quantidadeAbater = body.containsKey("quantidade") ? Double.valueOf(body.get("quantidade").toString()) : 1.0;
+
+        if (ingrediente.getQuantidadeEstoque() < quantidadeAbater) {
+            return ResponseEntity.badRequest().body(Map.of("erro", "Estoque insuficiente para abate."));
+        }
+
+        ingrediente.setQuantidadeEstoque(ingrediente.getQuantidadeEstoque() - quantidadeAbater);
+        ingredienteRepository.save(ingrediente);
+
+        return ResponseEntity.ok(Map.of("mensagem", "Baixa de " + quantidadeAbater + " " + ingrediente.getUnidadeMedida() + " realizada!"));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Object> excluir(@PathVariable Long id, Authentication authentication) {
+        Usuario usuario = usuarioRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new IllegalArgumentException(ERRO_USUARIO_NAO_ENCONTRADO));
+
+        var ingOpt = ingredienteRepository.findById(id);
+        if (ingOpt.isEmpty() || !ingOpt.get().getUsuario().getId().equals(usuario.getId())) {
+            return ResponseEntity.badRequest().body(Map.of("erro", ERRO_INGRED_NAO_ENCONTRADO));
         }
 
         ingredienteRepository.deleteById(id);
