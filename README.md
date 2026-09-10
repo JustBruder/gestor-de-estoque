@@ -75,4 +75,22 @@ A aplicação segue o modelo de arquitetura desacoplada (**Decoupled SPA + REST 
 
 ---
 
-## ✨ **[Clique para testar o site!](https://conferindoestoque.vercel.app/)** ✨✨
+## ✨ **[Clique para testar o site!](https://conferindoestoque.vercel.app/)** ✨
+
+---
+
+<div align="center">
+
+### 💻 Contate-me / Let's Connect 💖
+<div align="center">
+
+<a href="https://www.linkedin.com/in/ingrid-bruder/" target="_blank">
+  <img src="https://img.shields.io/badge/LinkedIn-FF69B4?style=for-the-badge&logo=linkedin&logoColor=white"/>
+</a>
+<a href="mailto:ibruder83@gmail.com" target="_blank">
+  <img src="https://img.shields.io/badge/Email-FF69B4?style=for-the-badge&logo=gmail&logoColor=white"/>
+</a>
+
+</div>
+  <sub>Desenvolvido por JustBruder 🌷✨</sub>
+</div>
