@@ -24,6 +24,16 @@ document.addEventListener("DOMContentLoaded", () => {
     if (formProduto) formProduto.addEventListener("submit", salvarProduto);
 });
 
+// Função auxiliar segura para converter JSON sem travar
+async function parseRes(res) {
+    const text = await res.text();
+    try {
+        return text ? JSON.parse(text) : {};
+    } catch (e) {
+        return { erro: text || `Erro HTTP ${res.status}` };
+    }
+}
+
 function iniciarEfeitoFluidoMouse() {
     document.addEventListener("mousemove", (e) => {
         const cards = document.querySelectorAll(".card, .glass-panel");
@@ -121,13 +131,13 @@ async function processarAuth(e) {
             body: JSON.stringify(payload)
         });
 
-        const data = await res.json();
+        const data = await parseRes(res);
 
         if (res.ok) {
             localStorage.setItem("usuario_gestor", JSON.stringify(data));
             verificarSessao();
         } else {
-            alert("❌ " + (data.erro || "Falha na autenticação."));
+            alert("❌ " + (data.erro || data.message || "Falha na autenticação."));
         }
     } catch (err) {
         alert("❌ Erro de conexão com o servidor.");
@@ -150,13 +160,13 @@ async function processarRedefinicao(e) {
             body: JSON.stringify(payload)
         });
 
-        const data = await res.json();
+        const data = await parseRes(res);
 
         if (res.ok) {
-            alert("✅ " + data.mensagem);
+            alert("✅ " + (data.mensagem || "Senha alterada com sucesso!"));
             fecharPerfilOuVoltar();
         } else {
-            alert("❌ " + (data.erro || "Falha ao redefinir senha."));
+            alert("❌ " + (data.erro || data.message || "Falha ao redefinir senha."));
         }
     } catch (err) {
         alert("❌ Erro de conexão com o servidor.");
@@ -181,8 +191,12 @@ async function carregarIngredientesSelect() {
     if (!usuarioLogado) return;
     try {
         const res = await fetch(`${API_BASE}/api/ingredientes`, { headers: getHeaders() });
-        if (res.ok) {
-            listaIngredientesGlobal = await res.json();
+        const data = await parseRes(res);
+        if (res.ok && Array.isArray(data)) {
+            listaIngredientesGlobal = data;
+        } else if (res.status === 401 || res.status === 403) {
+            alert("⚠️ Sua sessão expirou. Por favor, faça login novamente.");
+            fazerLogout();
         }
     } catch (err) {
         console.error("Erro ao carregar ingredientes:", err);
@@ -238,14 +252,17 @@ async function salvarIngrediente(e) {
             body: JSON.stringify(payload)
         });
 
-        const data = await res.json();
+        const data = await parseRes(res);
 
         if (res.ok) {
             alert("✅ Ingrediente cadastrado!");
             document.getElementById("formIngrediente").reset();
             await carregarIngredientesSelect();
+        } else if (res.status === 401 || res.status === 403) {
+            alert("⚠️ Sessão expirada! Faça login novamente.");
+            fazerLogout();
         } else {
-            alert("❌ " + (data.erro || "Erro ao salvar ingrediente."));
+            alert("❌ " + (data.erro || data.message || `Erro ${res.status} ao salvar ingrediente.`));
         }
     } catch (err) {
         alert("❌ Erro de conexão: " + err.message);
@@ -267,13 +284,16 @@ async function salvarBebida(e) {
             body: JSON.stringify(payload)
         });
 
-        const data = await res.json();
+        const data = await parseRes(res);
 
         if (res.ok) {
             alert("✅ Bebida cadastrada com sucesso!");
             document.getElementById("formBebida").reset();
+        } else if (res.status === 401 || res.status === 403) {
+            alert("⚠️ Sessão expirada! Faça login novamente.");
+            fazerLogout();
         } else {
-            alert("❌ " + (data.erro || "Erro ao salvar bebida."));
+            alert("❌ " + (data.erro || data.message || `Erro ${res.status} ao salvar bebida.`));
         }
     } catch (err) {
         alert("❌ Erro de conexão: " + err.message);
@@ -295,13 +315,16 @@ async function salvarItemAvulso(e) {
             body: JSON.stringify(payload)
         });
 
-        const data = await res.json();
+        const data = await parseRes(res);
 
         if (res.ok) {
             alert("✅ Item cadastrado com sucesso!");
             document.getElementById("formItemAvulso").reset();
+        } else if (res.status === 401 || res.status === 403) {
+            alert("⚠️ Sessão expirada! Faça login novamente.");
+            fazerLogout();
         } else {
-            const msgErro = data.erro || data.error || data.message || "Erro desconhecido no servidor.";
+            const msgErro = data.erro || data.error || data.message || `Erro ${res.status} no servidor.`;
             alert("❌ Erro ao salvar item: " + msgErro);
         }
     } catch (err) {
@@ -358,15 +381,18 @@ async function salvarProduto(e) {
             body: JSON.stringify(payload)
         });
 
-        const data = await res.json();
+        const data = await parseRes(res);
 
         if (res.ok) {
             alert("✅ Lanche cadastrado com sucesso!");
             document.getElementById("formProduto").reset();
             document.getElementById("listaItensReceita").innerHTML = "";
             await carregarIngredientesSelect();
+        } else if (res.status === 401 || res.status === 403) {
+            alert("⚠️ Sessão expirada! Faça login novamente.");
+            fazerLogout();
         } else {
-            alert("❌ " + (data.erro || "Erro ao salvar lanche."));
+            alert("❌ " + (data.erro || data.message || `Erro ${res.status} ao salvar lanche.`));
         }
     } catch (error) {
         alert("❌ Erro de conexão: " + error.message);
@@ -376,9 +402,9 @@ async function salvarProduto(e) {
 async function carregarEstoque() {
     try {
         const resIng = await fetch(`${API_BASE}/api/ingredientes`, { headers: getHeaders() });
-        const ingredientes = await resIng.json();
+        const ingredientes = await parseRes(resIng);
         const tbodyIng = document.getElementById("tabelaEstoque");
-        if (tbodyIng) {
+        if (tbodyIng && Array.isArray(ingredientes)) {
             tbodyIng.innerHTML = "";
             if (ingredientes.length === 0) {
                 tbodyIng.innerHTML = `<tr><td colspan="5" class="text-center text-muted">Nenhum ingrediente.</td></tr>`;
@@ -400,9 +426,9 @@ async function carregarEstoque() {
         }
 
         const resBeb = await fetch(`${API_BASE}/api/bebidas`, { headers: getHeaders() });
-        const bebidas = await resBeb.json();
+        const bebidas = await parseRes(resBeb);
         const tbodyBeb = document.getElementById("tabelaBebidasEstoque");
-        if (tbodyBeb) {
+        if (tbodyBeb && Array.isArray(bebidas)) {
             tbodyBeb.innerHTML = "";
             if (bebidas.length === 0) {
                 tbodyBeb.innerHTML = `<tr><td colspan="4" class="text-center text-muted">Nenhuma bebida.</td></tr>`;
@@ -423,9 +449,9 @@ async function carregarEstoque() {
         }
 
         const resItens = await fetch(`${API_BASE}/api/itens`, { headers: getHeaders() });
-        const itens = await resItens.json();
+        const itens = await parseRes(resItens);
         const tbodyItens = document.getElementById("tabelaItensEstoque");
-        if (tbodyItens) {
+        if (tbodyItens && Array.isArray(itens)) {
             tbodyItens.innerHTML = "";
             if (itens.length === 0) {
                 tbodyItens.innerHTML = `<tr><td colspan="4" class="text-center text-muted">Nenhum item cadastrado.</td></tr>`;
@@ -454,14 +480,14 @@ async function excluirIngrediente(id, nome) {
 
     try {
         const res = await fetch(`${API_BASE}/api/ingredientes/${id}`, { method: 'DELETE', headers: getHeaders() });
-        const data = await res.json();
+        const data = await parseRes(res);
 
         if (res.ok) {
-            alert("✅ " + data.mensagem);
+            alert("✅ " + (data.mensagem || "Ingrediente excluído!"));
             await carregarEstoque();
             await carregarIngredientesSelect();
         } else {
-            alert("❌ " + data.erro);
+            alert("❌ " + (data.erro || data.message || "Erro ao excluir."));
         }
     } catch (err) {
         alert("❌ Erro ao conectar ao servidor.");
@@ -473,13 +499,13 @@ async function excluirBebida(id, nome) {
 
     try {
         const res = await fetch(`${API_BASE}/api/bebidas/${id}`, { method: 'DELETE', headers: getHeaders() });
-        const data = await res.json();
+        const data = await parseRes(res);
 
         if (res.ok) {
-            alert("✅ " + data.mensagem);
+            alert("✅ " + (data.mensagem || "Bebida excluída!"));
             await carregarEstoque();
         } else {
-            alert("❌ " + data.erro);
+            alert("❌ " + (data.erro || data.message || "Erro ao excluir."));
         }
     } catch (err) {
         alert("❌ Erro ao conectar ao servidor.");
@@ -491,13 +517,13 @@ async function excluirItemAvulso(id, nome) {
 
     try {
         const res = await fetch(`${API_BASE}/api/itens/${id}`, { method: 'DELETE', headers: getHeaders() });
-        const data = await res.json();
+        const data = await parseRes(res);
 
         if (res.ok) {
-            alert("✅ " + data.mensagem);
+            alert("✅ " + (data.mensagem || "Item excluído!"));
             await carregarEstoque();
         } else {
-            alert("❌ " + data.erro);
+            alert("❌ " + (data.erro || data.message || "Erro ao excluir."));
         }
     } catch (err) {
         alert("❌ Erro de conexão.");
@@ -507,13 +533,13 @@ async function excluirItemAvulso(id, nome) {
 async function carregarAcrescimos() {
     try {
         const res = await fetch(`${API_BASE}/api/ingredientes`, { headers: getHeaders() });
-        const ingredientes = await res.json();
+        const ingredientes = await parseRes(res);
         const grid = document.getElementById("gridAcrescimos");
         if (!grid) return;
 
         grid.innerHTML = "";
 
-        if (ingredientes.length === 0) {
+        if (!Array.isArray(ingredientes) || ingredientes.length === 0) {
             grid.innerHTML = `<div class="col-12 text-center text-muted"><p>Nenhum ingrediente disponível para acréscimo.</p></div>`;
             return;
         }
@@ -543,13 +569,13 @@ async function darBaixaAcrescimo(ingredienteId, nome) {
             headers: getHeaders(),
             body: JSON.stringify({ quantidade: 1.0 })
         });
-        const data = await res.json();
+        const data = await parseRes(res);
 
         if (res.ok) {
-            alert("✅ " + data.mensagem);
+            alert("✅ " + (data.mensagem || "Baixa realizada!"));
             await carregarAcrescimos();
         } else {
-            alert("❌ " + data.erro);
+            alert("❌ " + (data.erro || data.message || "Erro ao dar baixa."));
         }
     } catch (err) {
         alert("❌ Erro de conexão.");
@@ -559,12 +585,12 @@ async function darBaixaAcrescimo(ingredienteId, nome) {
 async function carregarPDV() {
     try {
         const resProds = await fetch(`${API_BASE}/api/produtos`, { headers: getHeaders() });
-        const produtos = await resProds.json();
+        const produtos = await parseRes(resProds);
         const gridProds = document.getElementById("gridProdutosVenda");
         
         if (gridProds) {
             gridProds.innerHTML = "";
-            if (produtos.length === 0) {
+            if (!Array.isArray(produtos) || produtos.length === 0) {
                 gridProds.innerHTML = `<div class="col-12 text-muted"><p>Nenhum lanche cadastrado.</p></div>`;
             } else {
                 produtos.forEach(prod => {
@@ -590,12 +616,12 @@ async function carregarPDV() {
         }
 
         const resBebs = await fetch(`${API_BASE}/api/bebidas`, { headers: getHeaders() });
-        const bebidas = await resBebs.json();
+        const bebidas = await parseRes(resBebs);
         const gridBebs = document.getElementById("gridBebidasVenda");
 
         if (gridBebs) {
             gridBebs.innerHTML = "";
-            if (bebidas.length === 0) {
+            if (!Array.isArray(bebidas) || bebidas.length === 0) {
                 gridBebs.innerHTML = `<div class="col-12 text-muted"><p>Nenhuma bebida cadastrada.</p></div>`;
             } else {
                 bebidas.forEach(beb => {
@@ -617,12 +643,12 @@ async function carregarPDV() {
         }
 
         const resItens = await fetch(`${API_BASE}/api/itens`, { headers: getHeaders() });
-        const itens = await resItens.json();
+        const itens = await parseRes(resItens);
         const gridItens = document.getElementById("gridItensVenda");
 
         if (gridItens) {
             gridItens.innerHTML = "";
-            if (itens.length === 0) {
+            if (!Array.isArray(itens) || itens.length === 0) {
                 gridItens.innerHTML = `<div class="col-12 text-muted"><p>Nenhum item cadastrado.</p></div>`;
             } else {
                 itens.forEach(item => {
@@ -652,12 +678,12 @@ async function realizarVenda(produtoId, nomeProduto) {
 
     try {
         const res = await fetch(`${API_BASE}/api/vendas/${produtoId}`, { method: 'POST', headers: getHeaders() });
-        const data = await res.json();
+        const data = await parseRes(res);
 
         if (res.ok) {
             alert("✅ " + (data.mensagem || "Venda realizada!"));
         } else {
-            alert("❌ " + (data.erro || "Erro ao registrar venda."));
+            alert("❌ " + (data.erro || data.message || "Erro ao registrar venda."));
         }
     } catch (err) {
         alert("❌ Erro ao conectar ao servidor.");
@@ -667,13 +693,13 @@ async function realizarVenda(produtoId, nomeProduto) {
 async function venderBebida(id, nome) {
     try {
         const res = await fetch(`${API_BASE}/api/bebidas/${id}/venda`, { method: 'POST', headers: getHeaders() });
-        const data = await res.json();
+        const data = await parseRes(res);
 
         if (res.ok) {
-            alert("✅ " + data.mensagem);
+            alert("✅ " + (data.mensagem || "Venda realizada!"));
             await carregarPDV();
         } else {
-            alert("❌ " + data.erro);
+            alert("❌ " + (data.erro || data.message || "Erro ao vender bebida."));
         }
     } catch (err) {
         alert("❌ Erro ao conectar ao servidor.");
@@ -683,13 +709,13 @@ async function venderBebida(id, nome) {
 async function venderItemAvulso(id, nome) {
     try {
         const res = await fetch(`${API_BASE}/api/itens/${id}/venda`, { method: 'POST', headers: getHeaders() });
-        const data = await res.json();
+        const data = await parseRes(res);
 
         if (res.ok) {
-            alert("✅ " + data.mensagem);
+            alert("✅ " + (data.mensagem || "Venda realizada!"));
             await carregarPDV();
         } else {
-            alert("❌ " + data.erro);
+            alert("❌ " + (data.erro || data.message || "Erro ao vender item."));
         }
     } catch (err) {
         alert("❌ Erro ao conectar ao servidor.");
@@ -701,13 +727,13 @@ async function excluirLanche(id, nome) {
 
     try {
         const res = await fetch(`${API_BASE}/api/produtos/${id}`, { method: 'DELETE', headers: getHeaders() });
-        const data = await res.json();
+        const data = await parseRes(res);
 
         if (res.ok) {
-            alert("✅ " + data.mensagem);
+            alert("✅ " + (data.mensagem || "Lanche excluído!"));
             await carregarPDV();
         } else {
-            alert("❌ " + data.erro);
+            alert("❌ " + (data.erro || data.message || "Erro ao excluir lanche."));
         }
     } catch (err) {
         alert("❌ Erro de conexão.");
