@@ -23,6 +23,8 @@ import java.util.Map;
 @CrossOrigin(origins = "https://conferindoestoque.vercel.app")
 public class BebidaController {
 
+    private static final String KEY_ERRO = "erro";
+    private static final String KEY_MENSAGEM = "mensagem";
     private static final String ERRO_USUARIO_NAO_ENCONTRADO = "Usuário não encontrado.";
     private static final String ERRO_BEBIDA_NAO_ENCONTRADA = "Bebida não encontrada.";
 
@@ -53,7 +55,7 @@ public class BebidaController {
         bebida.setUsuario(usuario);
 
         Bebida salva = bebidaRepository.save(bebida);
-        return ResponseEntity.ok(salva);
+        return ResponseEntity.ok(Map.of("id", salva.getId(), "nome", salva.getNome()));
     }
 
     @PostMapping("/{id}/venda")
@@ -63,17 +65,17 @@ public class BebidaController {
 
         var bebOpt = bebidaRepository.findById(id);
         if (bebOpt.isEmpty() || !bebOpt.get().getUsuario().getId().equals(usuario.getId())) {
-            return ResponseEntity.badRequest().body(Map.of("erro", ERRO_BEBIDA_NAO_ENCONTRADA));
+            return ResponseEntity.badRequest().body(Map.of(KEY_ERRO, ERRO_BEBIDA_NAO_ENCONTRADA));
         }
 
         Bebida bebida = bebOpt.get();
         if (bebida.getQuantidadeEstoque() <= 0) {
-            return ResponseEntity.badRequest().body(Map.of("erro", "Estoque insuficiente para esta bebida."));
+            return ResponseEntity.badRequest().body(Map.of(KEY_ERRO, "Estoque insuficiente para esta bebida."));
         }
 
         bebida.setQuantidadeEstoque(bebida.getQuantidadeEstoque() - 1);
         bebidaRepository.save(bebida);
-        return ResponseEntity.ok(Map.of("mensagem", "Venda de bebida registrada com sucesso!"));
+        return ResponseEntity.ok(Map.of(KEY_MENSAGEM, "Venda de bebida registrada com sucesso!"));
     }
 
     @DeleteMapping("/{id}")
@@ -83,10 +85,10 @@ public class BebidaController {
 
         var bebOpt = bebidaRepository.findById(id);
         if (bebOpt.isEmpty() || !bebOpt.get().getUsuario().getId().equals(usuario.getId())) {
-            return ResponseEntity.badRequest().body(Map.of("erro", ERRO_BEBIDA_NAO_ENCONTRADA));
+            return ResponseEntity.badRequest().body(Map.of(KEY_ERRO, ERRO_BEBIDA_NAO_ENCONTRADA));
         }
 
         bebidaRepository.deleteById(id);
-        return ResponseEntity.ok(Map.of("mensagem", "Bebida excluída com sucesso!"));
+        return ResponseEntity.ok(Map.of(KEY_MENSAGEM, "Bebida excluída com sucesso!"));
     }
 }
