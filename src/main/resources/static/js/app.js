@@ -1,3 +1,5 @@
+const API_BASE = "https://app-58f13233-93ab-41e4-8cfa-d7aa4e33885f.cleverapps.io";
+
 let listaIngredientesGlobal = [];
 let usuarioLogado = null;
 let modoCadastro = false;
@@ -100,7 +102,7 @@ function voltarParaLogin() {
 
 async function processarAuth(e) {
     e.preventDefault();
-    const endpoint = modoCadastro ? "/api/auth/cadastrar" : "/api/auth/login";
+    const endpoint = modoCadastro ? `${API_BASE}/api/auth/cadastrar` : `${API_BASE}/api/auth/login`;
     
     const payload = {
         email: document.getElementById("authEmail").value,
@@ -122,7 +124,6 @@ async function processarAuth(e) {
         const data = await res.json();
 
         if (res.ok) {
-            // Guarda o objeto com token JWT, id, nome e email no localStorage
             localStorage.setItem("usuario_gestor", JSON.stringify(data));
             verificarSessao();
         } else {
@@ -143,7 +144,7 @@ async function processarRedefinicao(e) {
     };
 
     try {
-        const res = await fetch("/api/auth/redefinir-senha", {
+        const res = await fetch(`${API_BASE}/api/auth/redefinir-senha`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload)
@@ -168,7 +169,6 @@ function fazerLogout() {
     location.reload();
 }
 
-// Cabeçalho de Autenticação Segura via JWT
 function getHeaders() {
     const token = usuarioLogado ? usuarioLogado.token : "";
     return {
@@ -180,7 +180,7 @@ function getHeaders() {
 async function carregarIngredientesSelect() {
     if (!usuarioLogado) return;
     try {
-        const res = await fetch('/api/ingredientes', { headers: getHeaders() });
+        const res = await fetch(`${API_BASE}/api/ingredientes`, { headers: getHeaders() });
         if (res.ok) {
             listaIngredientesGlobal = await res.json();
         }
@@ -232,7 +232,7 @@ async function salvarIngrediente(e) {
             unidadeMedida: document.getElementById("ingUnidade").value
         };
 
-        const res = await fetch('/api/ingredientes', {
+        const res = await fetch(`${API_BASE}/api/ingredientes`, {
             method: 'POST',
             headers: getHeaders(),
             body: JSON.stringify(payload)
@@ -261,7 +261,7 @@ async function salvarBebida(e) {
             quantidadeEstoque: parseFloat(document.getElementById("bebQtd").value)
         };
 
-        const res = await fetch('/api/bebidas', {
+        const res = await fetch(`${API_BASE}/api/bebidas`, {
             method: 'POST',
             headers: getHeaders(),
             body: JSON.stringify(payload)
@@ -289,7 +289,7 @@ async function salvarItemAvulso(e) {
             quantidadeEstoque: parseFloat(document.getElementById("itemQtd").value)
         };
 
-        const res = await fetch('/api/itens', {
+        const res = await fetch(`${API_BASE}/api/itens`, {
             method: 'POST',
             headers: getHeaders(),
             body: JSON.stringify(payload)
@@ -352,7 +352,7 @@ async function salvarProduto(e) {
             itensReceita: itensReceita
         };
 
-        const res = await fetch('/api/produtos', {
+        const res = await fetch(`${API_BASE}/api/produtos`, {
             method: 'POST',
             headers: getHeaders(),
             body: JSON.stringify(payload)
@@ -375,7 +375,7 @@ async function salvarProduto(e) {
 
 async function carregarEstoque() {
     try {
-        const resIng = await fetch('/api/ingredientes', { headers: getHeaders() });
+        const resIng = await fetch(`${API_BASE}/api/ingredientes`, { headers: getHeaders() });
         const ingredientes = await resIng.json();
         const tbodyIng = document.getElementById("tabelaEstoque");
         if (tbodyIng) {
@@ -399,7 +399,7 @@ async function carregarEstoque() {
             }
         }
 
-        const resBeb = await fetch('/api/bebidas', { headers: getHeaders() });
+        const resBeb = await fetch(`${API_BASE}/api/bebidas`, { headers: getHeaders() });
         const bebidas = await resBeb.json();
         const tbodyBeb = document.getElementById("tabelaBebidasEstoque");
         if (tbodyBeb) {
@@ -422,7 +422,7 @@ async function carregarEstoque() {
             }
         }
 
-        const resItens = await fetch('/api/itens', { headers: getHeaders() });
+        const resItens = await fetch(`${API_BASE}/api/itens`, { headers: getHeaders() });
         const itens = await resItens.json();
         const tbodyItens = document.getElementById("tabelaItensEstoque");
         if (tbodyItens) {
@@ -453,7 +453,7 @@ async function excluirIngrediente(id, nome) {
     if (!confirm(`Tem certeza que deseja excluir o ingrediente: ${nome}?`)) return;
 
     try {
-        const res = await fetch(`/api/ingredientes/${id}`, { method: 'DELETE', headers: getHeaders() });
+        const res = await fetch(`${API_BASE}/api/ingredientes/${id}`, { method: 'DELETE', headers: getHeaders() });
         const data = await res.json();
 
         if (res.ok) {
@@ -472,7 +472,7 @@ async function excluirBebida(id, nome) {
     if (!confirm(`Tem certeza que deseja excluir a bebida: ${nome}?`)) return;
 
     try {
-        const res = await fetch(`/api/bebidas/${id}`, { method: 'DELETE', headers: getHeaders() });
+        const res = await fetch(`${API_BASE}/api/bebidas/${id}`, { method: 'DELETE', headers: getHeaders() });
         const data = await res.json();
 
         if (res.ok) {
@@ -490,7 +490,7 @@ async function excluirItemAvulso(id, nome) {
     if (!confirm(`Tem certeza que deseja excluir o item: ${nome}?`)) return;
 
     try {
-        const res = await fetch(`/api/itens/${id}`, { method: 'DELETE', headers: getHeaders() });
+        const res = await fetch(`${API_BASE}/api/itens/${id}`, { method: 'DELETE', headers: getHeaders() });
         const data = await res.json();
 
         if (res.ok) {
@@ -506,7 +506,7 @@ async function excluirItemAvulso(id, nome) {
 
 async function carregarAcrescimos() {
     try {
-        const res = await fetch('/api/ingredientes', { headers: getHeaders() });
+        const res = await fetch(`${API_BASE}/api/ingredientes`, { headers: getHeaders() });
         const ingredientes = await res.json();
         const grid = document.getElementById("gridAcrescimos");
         if (!grid) return;
@@ -538,7 +538,7 @@ async function carregarAcrescimos() {
 
 async function darBaixaAcrescimo(ingredienteId, nome) {
     try {
-        const res = await fetch(`/api/ingredientes/${ingredienteId}/acrescimo`, {
+        const res = await fetch(`${API_BASE}/api/ingredientes/${ingredienteId}/acrescimo`, {
             method: 'POST',
             headers: getHeaders(),
             body: JSON.stringify({ quantidade: 1.0 })
@@ -558,7 +558,7 @@ async function darBaixaAcrescimo(ingredienteId, nome) {
 
 async function carregarPDV() {
     try {
-        const resProds = await fetch('/api/produtos', { headers: getHeaders() });
+        const resProds = await fetch(`${API_BASE}/api/produtos`, { headers: getHeaders() });
         const produtos = await resProds.json();
         const gridProds = document.getElementById("gridProdutosVenda");
         
@@ -589,7 +589,7 @@ async function carregarPDV() {
             }
         }
 
-        const resBebs = await fetch('/api/bebidas', { headers: getHeaders() });
+        const resBebs = await fetch(`${API_BASE}/api/bebidas`, { headers: getHeaders() });
         const bebidas = await resBebs.json();
         const gridBebs = document.getElementById("gridBebidasVenda");
 
@@ -616,7 +616,7 @@ async function carregarPDV() {
             }
         }
 
-        const resItens = await fetch('/api/itens', { headers: getHeaders() });
+        const resItens = await fetch(`${API_BASE}/api/itens`, { headers: getHeaders() });
         const itens = await resItens.json();
         const gridItens = document.getElementById("gridItensVenda");
 
@@ -651,7 +651,7 @@ async function realizarVenda(produtoId, nomeProduto) {
     if (!confirm(`Confirmar venda de: ${nomeProduto}?`)) return;
 
     try {
-        const res = await fetch(`/api/vendas/${produtoId}`, { method: 'POST', headers: getHeaders() });
+        const res = await fetch(`${API_BASE}/api/vendas/${produtoId}`, { method: 'POST', headers: getHeaders() });
         const data = await res.json();
 
         if (res.ok) {
@@ -666,7 +666,7 @@ async function realizarVenda(produtoId, nomeProduto) {
 
 async function venderBebida(id, nome) {
     try {
-        const res = await fetch(`/api/bebidas/${id}/venda`, { method: 'POST', headers: getHeaders() });
+        const res = await fetch(`${API_BASE}/api/bebidas/${id}/venda`, { method: 'POST', headers: getHeaders() });
         const data = await res.json();
 
         if (res.ok) {
@@ -682,7 +682,7 @@ async function venderBebida(id, nome) {
 
 async function venderItemAvulso(id, nome) {
     try {
-        const res = await fetch(`/api/itens/${id}/venda`, { method: 'POST', headers: getHeaders() });
+        const res = await fetch(`${API_BASE}/api/itens/${id}/venda`, { method: 'POST', headers: getHeaders() });
         const data = await res.json();
 
         if (res.ok) {
@@ -700,7 +700,7 @@ async function excluirLanche(id, nome) {
     if (!confirm(`Tem certeza que deseja excluir o lanche: ${nome}?`)) return;
 
     try {
-        const res = await fetch(`/api/produtos/${id}`, { method: 'DELETE', headers: getHeaders() });
+        const res = await fetch(`${API_BASE}/api/produtos/${id}`, { method: 'DELETE', headers: getHeaders() });
         const data = await res.json();
 
         if (res.ok) {
