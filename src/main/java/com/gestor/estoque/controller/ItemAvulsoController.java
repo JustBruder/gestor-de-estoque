@@ -23,6 +23,8 @@ import java.util.Map;
 @CrossOrigin(origins = "https://conferindoestoque.vercel.app")
 public class ItemAvulsoController {
 
+    private static final String KEY_ERRO = "erro";
+    private static final String KEY_MENSAGEM = "mensagem";
     private static final String ERRO_USUARIO_NAO_ENCONTRADO = "Usuário não encontrado.";
     private static final String ERRO_ITEM_NAO_ENCONTRADO = "Item não encontrado.";
 
@@ -53,7 +55,7 @@ public class ItemAvulsoController {
         item.setUsuario(usuario);
 
         ItemAvulso salvo = itemRepository.save(item);
-        return ResponseEntity.ok(salvo);
+        return ResponseEntity.ok(Map.of("id", salvo.getId(), "nome", salvo.getNome()));
     }
 
     @PostMapping("/{id}/venda")
@@ -63,17 +65,17 @@ public class ItemAvulsoController {
 
         var itemOpt = itemRepository.findById(id);
         if (itemOpt.isEmpty() || !itemOpt.get().getUsuario().getId().equals(usuario.getId())) {
-            return ResponseEntity.badRequest().body(Map.of("erro", ERRO_ITEM_NAO_ENCONTRADO));
+            return ResponseEntity.badRequest().body(Map.of(KEY_ERRO, ERRO_ITEM_NAO_ENCONTRADO));
         }
 
         ItemAvulso item = itemOpt.get();
         if (item.getQuantidadeEstoque() <= 0) {
-            return ResponseEntity.badRequest().body(Map.of("erro", "Estoque insuficiente para este item."));
+            return ResponseEntity.badRequest().body(Map.of(KEY_ERRO, "Estoque insuficiente para este item."));
         }
 
         item.setQuantidadeEstoque(item.getQuantidadeEstoque() - 1);
         itemRepository.save(item);
-        return ResponseEntity.ok(Map.of("mensagem", "Venda de item registrada com sucesso!"));
+        return ResponseEntity.ok(Map.of(KEY_MENSAGEM, "Venda de item registrada com sucesso!"));
     }
 
     @DeleteMapping("/{id}")
@@ -83,10 +85,10 @@ public class ItemAvulsoController {
 
         var itemOpt = itemRepository.findById(id);
         if (itemOpt.isEmpty() || !itemOpt.get().getUsuario().getId().equals(usuario.getId())) {
-            return ResponseEntity.badRequest().body(Map.of("erro", ERRO_ITEM_NAO_ENCONTRADO));
+            return ResponseEntity.badRequest().body(Map.of(KEY_ERRO, ERRO_ITEM_NAO_ENCONTRADO));
         }
 
         itemRepository.deleteById(id);
-        return ResponseEntity.ok(Map.of("mensagem", "Item excluído com sucesso!"));
+        return ResponseEntity.ok(Map.of(KEY_MENSAGEM, "Item excluído com sucesso!"));
     }
 }
