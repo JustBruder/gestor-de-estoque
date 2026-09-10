@@ -1,5 +1,6 @@
 package com.gestor.estoque.controller;
 
+import com.gestor.estoque.dto.AcrescimoDTO;
 import com.gestor.estoque.dto.IngredienteDTO;
 import com.gestor.estoque.model.Ingrediente;
 import com.gestor.estoque.model.Usuario;
@@ -57,7 +58,7 @@ public class IngredienteController {
     }
 
     @PostMapping("/{id}/acrescimo")
-    public ResponseEntity<Object> darBaixaAcrescimo(@PathVariable Long id, @RequestBody Map<String, Object> body, Authentication authentication) {
+    public ResponseEntity<Object> darBaixaAcrescimo(@PathVariable Long id, @RequestBody(required = false) AcrescimoDTO dto, Authentication authentication) {
         Usuario usuario = usuarioRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new IllegalArgumentException(ERRO_USUARIO_NAO_ENCONTRADO));
 
@@ -67,7 +68,7 @@ public class IngredienteController {
         }
 
         Ingrediente ingrediente = ingOpt.get();
-        Double quantidadeAbater = body.containsKey("quantidade") ? Double.valueOf(body.get("quantidade").toString()) : 1.0;
+        Double quantidadeAbater = (dto != null && dto.quantidade() != null) ? dto.quantidade() : 1.0;
 
         if (ingrediente.getQuantidadeEstoque() < quantidadeAbater) {
             return ResponseEntity.badRequest().body(Map.of("erro", "Estoque insuficiente para abate."));
