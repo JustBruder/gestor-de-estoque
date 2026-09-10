@@ -5,10 +5,10 @@ import com.gestor.estoque.model.Usuario;
 import com.gestor.estoque.repository.IngredienteRepository;
 import com.gestor.estoque.repository.UsuarioRepository;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/ingredientes")
@@ -24,69 +24,31 @@ public class IngredienteController {
     }
 
     @GetMapping
-    public ResponseEntity<?> listar(@RequestHeader("X-Usuario-Id") Long usuarioId) {
-        return ResponseEntity.ok(ingredienteRepository.findByUsuarioId(usuarioId));
+    public ResponseEntity<?> listar(Authentication authentication) {
+        Usuario usuario = usuarioRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado."));
+        return ResponseEntity.ok(ingredienteRepository.findByUsuarioId(usuario.getId()));
     }
 
     @PostMapping
-    public ResponseEntity<?> criar(@RequestBody Map<String, Object> body, @RequestHeader("X-Usuario-Id") Long usuarioId) {
-        try {
-            Usuario usuario = usuarioRepository.findById(usuarioId)
-                    .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado."));
-
-            String nome = body.get("nome").toString().trim();
-
-            if (ingredienteRepository.findByUsuarioIdAndNomeIgnoreCase(usuarioId, nome).isPresent()) {
-                return ResponseEntity.badRequest().body(Map.of("erro", "O ingrediente '" + nome + "' já está cadastrado!"));
-            }
-
-            Double qtd = Double.valueOf(body.get("quantidadeEstoque").toString());
-            String unidade = body.get("unidadeMedida").toString();
-
-            Ingrediente ingrediente = new Ingrediente();
-            ingrediente.setNome(nome);
-            ingrediente.setQuantidadeEstoque(qtd);
-            ingrediente.setUnidadeMedida(unidade);
-            ingrediente.setUsuario(usuario);
-
-            return ResponseEntity.ok(ingredienteRepository.save(ingrediente));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("erro", "Erro ao salvar ingrediente: " + e.getMessage()));
-        }
+    public ResponseEntity<?> criar(@RequestBody Ingrediente ingrediente, Authentication authentication) {
+        Usuario usuario = usuarioRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado."));
+        ingrediente.setUsuario(usuario);
+        return ResponseEntity.ok(ingredienteRepository.save(ingrediente));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> excluir(@PathVariable Long id, @RequestHeader("X-Usuario-Id") Long usuarioId) {
-        Optional<Ingrediente> ingOpt = ingredienteRepository.findById(id);
-        if (ingOpt.isEmpty() || !ingOpt.get().getUsuario().getId().equals(usuarioId)) {
+    public ResponseEntity<?> excluir(@PathVariable Long id, Authentication authentication) {
+        Usuario usuario = usuarioRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado."));
+
+        var ingOpt = ingredienteRepository.findById(id);
+        if (ingOpt.isEmpty() || !ingOpt.get().getUsuario().getId().equals(usuario.getId())) {
             return ResponseEntity.badRequest().body(Map.of("erro", "Ingrediente não encontrado."));
         }
 
-        try {
-            ingredienteRepository.deleteById(id);
-            return ResponseEntity.ok(Map.of("mensagem", "Ingrediente removido com sucesso!"));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("erro", "Este ingrediente está em uso numa receita ativa. Remova o lanche primeiro!"));
-        }
-    }
-
-    @PostMapping("/{id}/acrescimo")
-    public ResponseEntity<?> darBaixaAcrescimo(@PathVariable Long id, @RequestBody Map<String, Object> body, @RequestHeader("X-Usuario-Id") Long usuarioId) {
-        Optional<Ingrediente> ingOpt = ingredienteRepository.findById(id);
-        if (ingOpt.isEmpty() || !ingOpt.get().getUsuario().getId().equals(usuarioId)) {
-            return ResponseEntity.badRequest().body(Map.of("erro", "Ingrediente não encontrado."));
-        }
-
-        Double qtdAbater = Double.valueOf(body.getOrDefault("quantidade", 1.0).toString());
-        Ingrediente ingrediente = ingOpt.get();
-
-        if (ingrediente.getQuantidadeEstoque() < qtdAbater) {
-            return ResponseEntity.badRequest().body(Map.of("erro", "Estoque insuficiente para esse acréscimo."));
-        }
-
-        ingrediente.setQuantidadeEstoque(ingrediente.getQuantidadeEstoque() - qtdAbater);
-        ingredienteRepository.save(ingrediente);
-
-        return ResponseEntity.ok(Map.of("mensagem", "Acréscimo registrado! Estoque de " + ingrediente.getNome() + " atualizado."));
+        ingredienteRepository.deleteById(id);
+        return ResponseEntity.ok(Map.of("mensagem", "Ingrediente excluído com sucesso!"));
     }
 }
