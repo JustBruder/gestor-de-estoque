@@ -5,10 +5,10 @@ import com.gestor.estoque.model.Usuario;
 import com.gestor.estoque.repository.BebidaRepository;
 import com.gestor.estoque.repository.UsuarioRepository;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/bebidas")
@@ -24,59 +24,47 @@ public class BebidaController {
     }
 
     @GetMapping
-    public ResponseEntity<?> listar(@RequestHeader("X-Usuario-Id") Long usuarioId) {
-        return ResponseEntity.ok(bebidaRepository.findByUsuarioId(usuarioId));
+    public ResponseEntity<?> listar(Authentication authentication) {
+        Usuario usuario = usuarioRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado."));
+        return ResponseEntity.ok(bebidaRepository.findByUsuarioId(usuario.getId()));
     }
 
     @PostMapping
-    public ResponseEntity<?> criar(@RequestBody Map<String, Object> body, @RequestHeader("X-Usuario-Id") Long usuarioId) {
-        try {
-            Usuario usuario = usuarioRepository.findById(usuarioId)
-                    .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado."));
-
-            String nome = body.get("nome").toString().trim();
-
-            if (bebidaRepository.findByUsuarioIdAndNomeIgnoreCase(usuarioId, nome).isPresent()) {
-                return ResponseEntity.badRequest().body(Map.of("erro", "A bebida '" + nome + "' já está cadastrada!"));
-            }
-
-            Double preco = Double.valueOf(body.get("preco").toString());
-            Double qtd = Double.valueOf(body.get("quantidadeEstoque").toString());
-
-            Bebida bebida = new Bebida();
-            bebida.setNome(nome);
-            bebida.setPreco(preco);
-            bebida.setQuantidadeEstoque(qtd);
-            bebida.setUsuario(usuario);
-
-            return ResponseEntity.ok(bebidaRepository.save(bebida));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("erro", "Erro ao cadastrar bebida: " + e.getMessage()));
-        }
+    public ResponseEntity<?> criar(@RequestBody Bebida bebida, Authentication authentication) {
+        Usuario usuario = usuarioRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado."));
+        bebida.setUsuario(usuario);
+        return ResponseEntity.ok(bebidaRepository.save(bebida));
     }
 
     @PostMapping("/{id}/venda")
-    public ResponseEntity<?> vender(@PathVariable Long id, @RequestHeader("X-Usuario-Id") Long usuarioId) {
-        Optional<Bebida> bebOpt = bebidaRepository.findById(id);
-        if (bebOpt.isEmpty() || !bebOpt.get().getUsuario().getId().equals(usuarioId)) {
+    public ResponseEntity<?> vender(@PathVariable Long id, Authentication authentication) {
+        Usuario usuario = usuarioRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado."));
+
+        var bebOpt = bebidaRepository.findById(id);
+        if (bebOpt.isEmpty() || !bebOpt.get().getUsuario().getId().equals(usuario.getId())) {
             return ResponseEntity.badRequest().body(Map.of("erro", "Bebida não encontrada."));
         }
 
         Bebida bebida = bebOpt.get();
-        if (bebida.getQuantidadeEstoque() < 1) {
-            return ResponseEntity.badRequest().body(Map.of("erro", "Estoque esgotado para " + bebida.getNome()));
+        if (bebida.getQuantidadeEstoque() <= 0) {
+            return ResponseEntity.badRequest().body(Map.of("erro", "Estoque insuficiente para esta bebida."));
         }
 
         bebida.setQuantidadeEstoque(bebida.getQuantidadeEstoque() - 1);
         bebidaRepository.save(bebida);
-
-        return ResponseEntity.ok(Map.of("mensagem", "Venda de " + bebida.getNome() + " registrada com sucesso!"));
+        return ResponseEntity.ok(Map.of("mensagem", "Venda de bebida registrada com sucesso!"));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> excluir(@PathVariable Long id, @RequestHeader("X-Usuario-Id") Long usuarioId) {
-        Optional<Bebida> bebOpt = bebidaRepository.findById(id);
-        if (bebOpt.isEmpty() || !bebOpt.get().getUsuario().getId().equals(usuarioId)) {
+    public ResponseEntity<?> excluir(@PathVariable Long id, Authentication authentication) {
+        Usuario usuario = usuarioRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado."));
+
+        var bebOpt = bebidaRepository.findById(id);
+        if (bebOpt.isEmpty() || !bebOpt.get().getUsuario().getId().equals(usuario.getId())) {
             return ResponseEntity.badRequest().body(Map.of("erro", "Bebida não encontrada."));
         }
 
