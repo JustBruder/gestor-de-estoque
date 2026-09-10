@@ -1,5 +1,6 @@
 package com.gestor.estoque.controller;
 
+import com.gestor.estoque.dto.ItemAvulsoDTO;
 import com.gestor.estoque.model.ItemAvulso;
 import com.gestor.estoque.model.Usuario;
 import com.gestor.estoque.repository.ItemAvulsoRepository;
@@ -41,12 +42,16 @@ public class ItemAvulsoController {
     }
 
     @PostMapping
-    public ResponseEntity<Object> criar(@RequestBody ItemAvulso item, Authentication authentication) {
+    public ResponseEntity<Object> criar(@RequestBody ItemAvulsoDTO dto, Authentication authentication) {
         Usuario usuario = usuarioRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new IllegalArgumentException(ERRO_USUARIO_NAO_ENCONTRADO));
 
-        item.setId(null); // Proteção contra Overposting
+        ItemAvulso item = new ItemAvulso();
+        item.setNome(dto.nome().trim());
+        item.setPreco(dto.preco());
+        item.setQuantidadeEstoque(dto.quantidadeEstoque());
         item.setUsuario(usuario);
+
         ItemAvulso salvo = itemRepository.save(item);
         return ResponseEntity.ok(salvo);
     }
