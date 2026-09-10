@@ -19,7 +19,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/itens")
-@CrossOrigin(origins = "*")
+@CrossOrigin(origins = "https://conferindoestoque.vercel.app")
 public class ItemAvulsoController {
 
     private static final String ERRO_USUARIO_NAO_ENCONTRADO = "Usuário não encontrado.";
@@ -45,6 +45,7 @@ public class ItemAvulsoController {
         Usuario usuario = usuarioRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new IllegalArgumentException(ERRO_USUARIO_NAO_ENCONTRADO));
 
+        item.setId(null); // Proteção contra Overposting
         item.setUsuario(usuario);
         ItemAvulso salvo = itemRepository.save(item);
         return ResponseEntity.ok(salvo);
