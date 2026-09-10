@@ -1,7 +1,10 @@
 package com.gestor.estoque.controller;
 
+import com.gestor.estoque.dto.ProdutoDTO;
+import com.gestor.estoque.model.ItemReceita;
 import com.gestor.estoque.model.Produto;
 import com.gestor.estoque.model.Usuario;
+import com.gestor.estoque.repository.IngredienteRepository;
 import com.gestor.estoque.repository.ProdutoRepository;
 import com.gestor.estoque.repository.UsuarioRepository;
 import org.springframework.http.ResponseEntity;
@@ -15,6 +18,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -27,10 +32,12 @@ public class ProdutoController {
 
     private final ProdutoRepository produtoRepository;
     private final UsuarioRepository usuarioRepository;
+    private final IngredienteRepository ingredienteRepository;
 
-    public ProdutoController(ProdutoRepository produtoRepository, UsuarioRepository usuarioRepository) {
+    public ProdutoController(ProdutoRepository produtoRepository, UsuarioRepository usuarioRepository, IngredienteRepository ingredienteRepository) {
         this.produtoRepository = produtoRepository;
         this.usuarioRepository = usuarioRepository;
+        this.ingredienteRepository = ingredienteRepository;
     }
 
     @GetMapping
@@ -41,15 +48,28 @@ public class ProdutoController {
     }
 
     @PostMapping
-    public ResponseEntity<Object> criar(@RequestBody Produto produto, Authentication authentication) {
+    public ResponseEntity<Object> criar(@RequestBody ProdutoDTO dto, Authentication authentication) {
         Usuario usuario = usuarioRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new IllegalArgumentException(ERRO_USUARIO_NAO_ENCONTRADO));
 
-        produto.setId(null); // Proteção contra Overposting
+        Produto produto = new Produto();
+        produto.setNome(dto.nome().trim());
+        produto.setPreco(dto.preco());
         produto.setUsuario(usuario);
 
-        if (produto.getReceita() != null) {
-            produto.getReceita().forEach(item -> item.setProduto(produto));
+        if (dto.itensReceita() != null && !dto.itensReceita().isEmpty()) {
+            List<ItemReceita> receita = new ArrayList<>();
+            for (var itemDto : dto.itensReceita()) {
+                var ingOpt = ingredienteRepository.findById(itemDto.ingredienteId());
+                if (ingOpt.isPresent()) {
+                    ItemReceita item = new ItemReceita();
+                    item.setIngrediente(ingOpt.get());
+                    item.setQuantidadeNecessaria(itemDto.quantidadeNecessaria());
+                    item.setProduto(produto);
+                    receita.add(item);
+                }
+            }
+            produto.setReceita(receita);
         }
 
         Produto salvo = produtoRepository.save(produto);
