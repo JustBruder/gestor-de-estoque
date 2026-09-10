@@ -8,6 +8,7 @@ import com.gestor.estoque.repository.IngredienteRepository;
 import com.gestor.estoque.repository.ProdutoRepository;
 import com.gestor.estoque.repository.UsuarioRepository;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -30,15 +31,17 @@ public class ProdutoController {
     }
 
     @GetMapping
-    public ResponseEntity<?> listar(@RequestHeader("X-Usuario-Id") Long usuarioId) {
-        return ResponseEntity.ok(produtoRepository.findByUsuarioId(usuarioId));
+    public ResponseEntity<?> listar(Authentication authentication) {
+        Usuario usuario = usuarioRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado."));
+        return ResponseEntity.ok(produtoRepository.findByUsuarioId(usuario.getId()));
     }
 
     @PostMapping
     @SuppressWarnings("unchecked")
-    public ResponseEntity<?> criar(@RequestBody Map<String, Object> body, @RequestHeader("X-Usuario-Id") Long usuarioId) {
+    public ResponseEntity<?> criar(@RequestBody Map<String, Object> body, Authentication authentication) {
         try {
-            Usuario usuario = usuarioRepository.findById(usuarioId)
+            Usuario usuario = usuarioRepository.findByEmail(authentication.getName())
                     .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado."));
 
             String nome = body.get("nome").toString().trim();
@@ -80,9 +83,12 @@ public class ProdutoController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> excluir(@PathVariable Long id, @RequestHeader("X-Usuario-Id") Long usuarioId) {
+    public ResponseEntity<?> excluir(@PathVariable Long id, Authentication authentication) {
+        Usuario usuario = usuarioRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado."));
+
         Optional<Produto> prodOpt = produtoRepository.findById(id);
-        if (prodOpt.isEmpty() || !prodOpt.get().getUsuario().getId().equals(usuarioId)) {
+        if (prodOpt.isEmpty() || !prodOpt.get().getUsuario().getId().equals(usuario.getId())) {
             return ResponseEntity.badRequest().body(Map.of("erro", "Lanche não encontrado."));
         }
 
