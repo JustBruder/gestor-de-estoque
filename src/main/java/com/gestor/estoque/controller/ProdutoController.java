@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -51,10 +52,41 @@ public class ProdutoController {
     }
 
     @GetMapping
-    public ResponseEntity<Iterable<Produto>> listar(Authentication authentication) {
+    @Transactional(readOnly = true)
+    public ResponseEntity<List<Map<String, Object>>> listar(Authentication authentication) {
         Usuario usuario = usuarioRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new IllegalArgumentException(ERRO_USUARIO_NAO_ENCONTRADO));
-        return ResponseEntity.ok(produtoRepository.findByUsuarioId(usuario.getId()));
+
+        List<Produto> produtos = produtoRepository.findByUsuarioId(usuario.getId());
+        List<Map<String, Object>> resposta = new ArrayList<>();
+
+        for (Produto p : produtos) {
+            Map<String, Object> prodMap = new HashMap<>();
+            prodMap.put("id", p.getId());
+            prodMap.put("nome", p.getNome());
+            prodMap.put("preco", p.getPreco());
+
+            List<Map<String, Object>> receitaList = new ArrayList<>();
+            if (p.getReceita() != null) {
+                for (ItemReceita item : p.getReceita()) {
+                    Map<String, Object> itemMap = new HashMap<>();
+                    itemMap.put("id", item.getId());
+                    itemMap.put("quantidadeNecessaria", item.getQuantidadeNecessaria());
+                    if (item.getIngrediente() != null) {
+                        Map<String, Object> ingMap = new HashMap<>();
+                        ingMap.put("id", item.getIngrediente().getId());
+                        ingMap.put("nome", item.getIngrediente().getNome());
+                        ingMap.put("unidadeMedida", item.getIngrediente().getUnidadeMedida());
+                        itemMap.put("ingrediente", ingMap);
+                    }
+                    receitaList.add(itemMap);
+                }
+            }
+            prodMap.put("receita", receitaList);
+            resposta.add(prodMap);
+        }
+
+        return ResponseEntity.ok(resposta);
     }
 
     @PostMapping
@@ -79,7 +111,6 @@ public class ProdutoController {
 
         if (body.containsKey("itensReceita")) {
             List<Map<String, Object>> itensRaw = (List<Map<String, Object>>) body.get("itensReceita");
-            List<ItemReceita> receitaList = new ArrayList<>();
 
             for (Map<String, Object> itemMap : itensRaw) {
                 Long ingId = Long.valueOf(itemMap.get("ingredienteId").toString());
@@ -92,13 +123,11 @@ public class ProdutoController {
                     itemReceita.setIngrediente(ingOpt.get());
                     itemReceita.setQuantidadeNecessaria(qtd);
                     itemReceitaRepository.save(itemReceita);
-                    receitaList.add(itemReceita);
                 }
             }
-            produtoSalvo.setReceita(receitaList);
         }
 
-        return ResponseEntity.ok(produtoSalvo);
+        return ResponseEntity.ok(Map.of(KEY_MENSAGEM, "Lanche cadastrado com sucesso!"));
     }
 
     @DeleteMapping("/{id}")
