@@ -26,9 +26,6 @@ public class ItemReceita {
 
     private Double quantidadeNecessaria;
 
-    public ItemReceita() {
-    }
-
     public Long getId() {
         return id;
     }
