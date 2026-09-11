@@ -7,6 +7,7 @@ import com.gestor.estoque.model.ItemReceita;
 import com.gestor.estoque.model.Produto;
 import com.gestor.estoque.model.Usuario;
 import com.gestor.estoque.repository.IngredienteRepository;
+import com.gestor.estoque.repository.ItemReceitaRepository;
 import com.gestor.estoque.repository.ProdutoRepository;
 import com.gestor.estoque.repository.UsuarioRepository;
 import org.springframework.http.ResponseEntity;
@@ -24,13 +25,16 @@ public class ProdutoController {
 
     private final ProdutoRepository produtoRepository;
     private final IngredienteRepository ingredienteRepository;
+    private final ItemReceitaRepository itemReceitaRepository;
     private final UsuarioRepository usuarioRepository;
 
     public ProdutoController(ProdutoRepository produtoRepository,
                              IngredienteRepository ingredienteRepository,
+                             ItemReceitaRepository itemReceitaRepository,
                              UsuarioRepository usuarioRepository) {
         this.produtoRepository = produtoRepository;
         this.ingredienteRepository = ingredienteRepository;
+        this.itemReceitaRepository = itemReceitaRepository;
         this.usuarioRepository = usuarioRepository;
     }
 
@@ -39,7 +43,6 @@ public class ProdutoController {
         Usuario usuario = usuarioRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado."));
         
-        // Agora o Spring já devolve o Produto com a lista de Receita montadinha pro Front-end!
         return ResponseEntity.ok(produtoRepository.findByUsuarioId(usuario.getId()));
     }
 
@@ -54,7 +57,10 @@ public class ProdutoController {
         produto.setPreco(dto.getPreco());
         produto.setUsuario(usuario);
 
-        // Se veio ingredientes do app.js, a gente atrela eles no produto
+        // PASSO 1: Força bruta. Salva o lanche primeiro pra ele existir de fato no banco.
+        Produto produtoSalvo = produtoRepository.save(produto);
+
+        // PASSO 2: Se tem ingredientes, vamos atrelar um por um.
         if (dto.getItensReceita() != null && !dto.getItensReceita().isEmpty()) {
             for (ItemReceitaDTO itemDto : dto.getItensReceita()) {
                 Ingrediente ing = ingredienteRepository.findById(itemDto.getIngredienteId())
@@ -64,14 +70,13 @@ public class ProdutoController {
                 itemReceita.setIngrediente(ing);
                 itemReceita.setQuantidadeNecessaria(itemDto.getQuantidadeNecessaria());
                 
-                // Avisa de quem é essa receita e insere na lista do Produto
-                itemReceita.setProduto(produto);
-                produto.getReceita().add(itemReceita); 
+                // Atrela ao lanche recém-salvo
+                itemReceita.setProduto(produtoSalvo); 
+                
+                // PASSO 3: Salva a receita na marra. Chega de depender de mágica.
+                itemReceitaRepository.save(itemReceita);
             }
         }
-
-        // Salvar o Produto agora salva as receitas junto (graças ao CascadeType.ALL)
-        produtoRepository.save(produto);
         
         return ResponseEntity.ok(Map.of("mensagem", "Lanche cadastrado com sucesso!"));
     }
@@ -87,7 +92,6 @@ public class ProdutoController {
             return ResponseEntity.badRequest().body(Map.of("erro", "Produto não encontrado."));
         }
 
-        // Excluir o Produto agora apaga as receitas atreladas a ele no banco (graças ao orphanRemoval=true)
         produtoRepository.deleteById(id);
         return ResponseEntity.ok(Map.of("mensagem", "Lanche excluído com sucesso!"));
     }
