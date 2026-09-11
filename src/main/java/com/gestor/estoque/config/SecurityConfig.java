@@ -1,5 +1,6 @@
-package com.gestor.estoque.security;
+package com.gestor.estoque.config;
 
+import com.gestor.estoque.security.JwtFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -19,10 +20,10 @@ import java.util.List;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    private final SecurityFilter securityFilter;
+    private final JwtFilter jwtFilter;
 
-    public SecurityConfig(SecurityFilter securityFilter) {
-        this.securityFilter = securityFilter;
+    public SecurityConfig(JwtFilter jwtFilter) {
+        this.jwtFilter = jwtFilter;
     }
 
     @Bean
@@ -36,16 +37,17 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .anyRequest().authenticated()
                 )
-                .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("*"));
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"));
+        configuration.setAllowedOriginPatterns(List.of("*"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"));
         configuration.setAllowedHeaders(List.of("*"));
+        configuration.setExposedHeaders(List.of("*"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
