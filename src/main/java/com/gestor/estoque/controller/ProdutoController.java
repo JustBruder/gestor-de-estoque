@@ -58,6 +58,7 @@ public class ProdutoController {
                 .orElseThrow(() -> new IllegalArgumentException(ERRO_USUARIO_NAO_ENCONTRADO));
 
         List<Produto> produtos = produtoRepository.findByUsuarioId(usuario.getId());
+        List<ItemReceita> todasReceitas = itemReceitaRepository.findAll();
         List<Map<String, Object>> resposta = new ArrayList<>();
 
         for (Produto p : produtos) {
@@ -67,8 +68,8 @@ public class ProdutoController {
             prodMap.put("preco", p.getPreco());
 
             List<Map<String, Object>> receitaList = new ArrayList<>();
-            if (p.getReceita() != null) {
-                for (ItemReceita item : p.getReceita()) {
+            for (ItemReceita item : todasReceitas) {
+                if (item.getProduto() != null && item.getProduto().getId().equals(p.getId())) {
                     Map<String, Object> itemMap = new HashMap<>();
                     itemMap.put("id", item.getId());
                     itemMap.put("quantidadeNecessaria", item.getQuantidadeNecessaria());
@@ -109,20 +110,25 @@ public class ProdutoController {
 
         Produto produtoSalvo = produtoRepository.save(produto);
 
-        if (body.containsKey("itensReceita")) {
-            List<Map<String, Object>> itensRaw = (List<Map<String, Object>>) body.get("itensReceita");
+        if (body.containsKey("itensReceita") && body.get("itensReceita") instanceof List) {
+            List<?> itensRaw = (List<?>) body.get("itensReceita");
 
-            for (Map<String, Object> itemMap : itensRaw) {
-                Long ingId = Long.valueOf(itemMap.get("ingredienteId").toString());
-                Double qtd = Double.valueOf(itemMap.get("quantidadeNecessaria").toString());
+            for (Object itemObj : itensRaw) {
+                if (itemObj instanceof Map) {
+                    Map<?, ?> itemMap = (Map<?, ?>) itemObj;
+                    if (itemMap.containsKey("ingredienteId") && itemMap.containsKey("quantidadeNecessaria")) {
+                        Long ingId = Long.valueOf(itemMap.get("ingredienteId").toString());
+                        Double qtd = Double.valueOf(itemMap.get("quantidadeNecessaria").toString());
 
-                Optional<Ingrediente> ingOpt = ingredienteRepository.findById(ingId);
-                if (ingOpt.isPresent()) {
-                    ItemReceita itemReceita = new ItemReceita();
-                    itemReceita.setProduto(produtoSalvo);
-                    itemReceita.setIngrediente(ingOpt.get());
-                    itemReceita.setQuantidadeNecessaria(qtd);
-                    itemReceitaRepository.save(itemReceita);
+                        Optional<Ingrediente> ingOpt = ingredienteRepository.findById(ingId);
+                        if (ingOpt.isPresent()) {
+                            ItemReceita itemReceita = new ItemReceita();
+                            itemReceita.setProduto(produtoSalvo);
+                            itemReceita.setIngrediente(ingOpt.get());
+                            itemReceita.setQuantidadeNecessaria(qtd);
+                            itemReceitaRepository.save(itemReceita);
+                        }
+                    }
                 }
             }
         }
@@ -142,8 +148,11 @@ public class ProdutoController {
         }
 
         Produto produto = prodOpt.get();
-        if (produto.getReceita() != null && !produto.getReceita().isEmpty()) {
-            itemReceitaRepository.deleteAll(produto.getReceita());
+        List<ItemReceita> todasReceitas = itemReceitaRepository.findAll();
+        for (ItemReceita item : todasReceitas) {
+            if (item.getProduto() != null && item.getProduto().getId().equals(produto.getId())) {
+                itemReceitaRepository.delete(item);
+            }
         }
 
         produtoRepository.delete(produto);
