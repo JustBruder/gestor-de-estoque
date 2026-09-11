@@ -72,28 +72,40 @@ public class ProdutoController {
             List<Map<String, Object>> receitaList = new ArrayList<>();
             for (ItemReceita item : todasReceitas) {
                 if (item.getProduto() != null && item.getProduto().getId().equals(p.getId())) {
-                    Map<String, Object> itemMap = new HashMap<>();
-                    itemMap.put("id", item.getId());
-                    itemMap.put("quantidadeNecessaria", item.getQuantidadeNecessaria());
-                    itemMap.put("quantidade", item.getQuantidadeNecessaria());
-                    if (item.getIngrediente() != null) {
-                        Map<String, Object> ingMap = new HashMap<>();
-                        ingMap.put("id", item.getIngrediente().getId());
-                        ingMap.put(KEY_NOME, item.getIngrediente().getNome());
-                        ingMap.put("unidadeMedida", item.getIngrediente().getUnidadeMedida());
-                        itemMap.put("ingrediente", ingMap);
-                        itemMap.put("ingredienteNome", item.getIngrediente().getNome());
-                        itemMap.put("ingredienteId", item.getIngrediente().getId());
-                    }
+                    Map<String, Object> itemMap = montarItemReceitaMap(item);
                     receitaList.add(itemMap);
                 }
             }
             prodMap.put("receita", receitaList);
             prodMap.put("itensReceita", receitaList);
+            prodMap.put("ingredientes", receitaList);
             resposta.add(prodMap);
         }
 
         return ResponseEntity.ok(resposta);
+    }
+
+    private Map<String, Object> montarItemReceitaMap(ItemReceita item) {
+        Map<String, Object> itemMap = new HashMap<>();
+        itemMap.put("id", item.getId());
+        itemMap.put("quantidadeNecessaria", item.getQuantidadeNecessaria());
+        itemMap.put("quantidade", item.getQuantidadeNecessaria());
+        itemMap.put("qtd", item.getQuantidadeNecessaria());
+
+        if (item.getIngrediente() != null) {
+            Ingrediente ing = item.getIngrediente();
+            Map<String, Object> ingMap = new HashMap<>();
+            ingMap.put("id", ing.getId());
+            ingMap.put(KEY_NOME, ing.getNome());
+            ingMap.put("unidadeMedida", ing.getUnidadeMedida());
+
+            itemMap.put("ingrediente", ingMap);
+            itemMap.put("nome", ing.getNome());
+            itemMap.put("ingredienteNome", ing.getNome());
+            itemMap.put("unidadeMedida", ing.getUnidadeMedida());
+            itemMap.put("ingredienteId", ing.getId());
+        }
+        return itemMap;
     }
 
     @PostMapping
@@ -116,63 +128,82 @@ public class ProdutoController {
 
         Produto produtoSalvo = produtoRepository.save(produto);
 
-        Object itensObj = body.get("itensReceita");
-        if (itensObj == null) {
-            itensObj = body.get("receita");
-        }
-
-        if (itensObj instanceof List<?> itensList) {
-            processarItensReceita(itensList, produtoSalvo);
-        }
+        List<?> itensList = extrairListaDeReceita(body);
+        processarItensReceita(itensList, produtoSalvo);
 
         return ResponseEntity.ok(Map.of(KEY_MENSAGEM, "Lanche cadastrado com sucesso!"));
     }
 
+    private List<?> extrairListaDeReceita(Map<String, Object> body) {
+        String[] chaves = {"itensReceita", "receita", "ingredientes", "itens", "listaIngredientes", "ingredientesLanche"};
+        for (String chave : chaves) {
+            Object val = body.get(chave);
+            if (val instanceof List<?> list && !list.isEmpty()) {
+                return list;
+            }
+        }
+        return new ArrayList<>();
+    }
+
     private void processarItensReceita(List<?> itensList, Produto produtoSalvo) {
         for (Object itemObj : itensList) {
-            if (itemObj instanceof Map<?, ?> itemMap) {
-                Long ingId = extrairIngredienteId(itemMap);
-                Double qtd = extrairQuantidade(itemMap);
+            Long ingId = null;
+            Double qtd = 1.0;
 
-                if (ingId != null && qtd != null) {
-                    Optional<Ingrediente> ingOpt = ingredienteRepository.findById(ingId);
-                    if (ingOpt.isPresent()) {
-                        ItemReceita itemReceita = new ItemReceita();
-                        itemReceita.setProduto(produtoSalvo);
-                        itemReceita.setIngrediente(ingOpt.get());
-                        itemReceita.setQuantidadeNecessaria(qtd);
-                        itemReceitaRepository.save(itemReceita);
-                    }
+            if (itemObj instanceof Map<?, ?> itemMap) {
+                ingId = extrairIngredienteId(itemMap);
+                Double qtdExtraida = extrairQuantidade(itemMap);
+                if (qtdExtraida != null) {
+                    qtd = qtdExtraida;
+                }
+            } else if (itemObj instanceof Number num) {
+                ingId = num.longValue();
+            }
+
+            if (ingId != null) {
+                Optional<Ingrediente> ingOpt = ingredienteRepository.findById(ingId);
+                if (ingOpt.isPresent()) {
+                    ItemReceita itemReceita = new ItemReceita();
+                    itemReceita.setProduto(produtoSalvo);
+                    itemReceita.setIngrediente(ingOpt.get());
+                    itemReceita.setQuantidadeNecessaria(qtd);
+                    itemReceitaRepository.save(itemReceita);
                 }
             }
         }
     }
 
     private Long extrairIngredienteId(Map<?, ?> itemMap) {
-        if (itemMap.containsKey("ingredienteId")) {
-            return Long.valueOf(itemMap.get("ingredienteId").toString());
-        }
-        if (itemMap.containsKey("ingrediente_id")) {
-            return Long.valueOf(itemMap.get("ingrediente_id").toString());
+        String[] chavesId = {"ingredienteId", "ingrediente_id", "idIngrediente", "id"};
+        for (String chave : chavesId) {
+            if (itemMap.containsKey(chave) && itemMap.get(chave) != null) {
+                try {
+                    return Long.valueOf(itemMap.get(chave).toString());
+                } catch (NumberFormatException e) {
+                    // ignora e tenta proxima chave
+                }
+            }
         }
         if (itemMap.containsKey("ingrediente") && itemMap.get("ingrediente") instanceof Map<?, ?> ingSubMap && ingSubMap.containsKey("id")) {
-            return Long.valueOf(ingSubMap.get("id").toString());
-        }
-        if (itemMap.containsKey("id")) {
-            return Long.valueOf(itemMap.get("id").toString());
+            try {
+                return Long.valueOf(ingSubMap.get("id").toString());
+            } catch (NumberFormatException e) {
+                // ignora
+            }
         }
         return null;
     }
 
     private Double extrairQuantidade(Map<?, ?> itemMap) {
-        if (itemMap.containsKey("quantidadeNecessaria")) {
-            return Double.valueOf(itemMap.get("quantidadeNecessaria").toString());
-        }
-        if (itemMap.containsKey("quantidade")) {
-            return Double.valueOf(itemMap.get("quantidade").toString());
-        }
-        if (itemMap.containsKey("qtd")) {
-            return Double.valueOf(itemMap.get("qtd").toString());
+        String[] chavesQtd = {"quantidadeNecessaria", "quantidade", "qtd", "quantidade_necessaria", "qtdNecessaria"};
+        for (String chave : chavesQtd) {
+            if (itemMap.containsKey(chave) && itemMap.get(chave) != null) {
+                try {
+                    return Double.valueOf(itemMap.get(chave).toString());
+                } catch (NumberFormatException e) {
+                    // ignora
+                }
+            }
         }
         return null;
     }
