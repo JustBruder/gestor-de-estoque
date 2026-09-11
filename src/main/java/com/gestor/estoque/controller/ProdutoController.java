@@ -73,30 +73,35 @@ public class ProdutoController {
         List<Map<String, Object>> resposta = new ArrayList<>();
 
         for (Produto p : produtos) {
-            Map<String, Object> prodMap = new HashMap<>();
-            prodMap.put("id", p.getId());
-            prodMap.put(KEY_NOME, p.getNome());
-            prodMap.put(KEY_PRECO, p.getPreco());
-
-            List<Map<String, Object>> receitaList = new ArrayList<>();
-            List<String> receitaNomes = new ArrayList<>();
-            for (ItemReceita item : todasReceitas) {
-                if (item.getProduto() != null && item.getProduto().getId() != null && item.getProduto().getId().equals(p.getId())) {
-                    Map<String, Object> itemMap = montarItemReceitaMap(item);
-                    receitaList.add(itemMap);
-                    if (item.getIngrediente() != null) {
-                        receitaNomes.add(item.getQuantidadeNecessaria() + " " + item.getIngrediente().getUnidadeMedida() + " de " + item.getIngrediente().getNome());
-                    }
-                }
-            }
-            prodMap.put(KEY_RECEITA, receitaList);
-            prodMap.put(KEY_ITENS_RECEITA, receitaList);
-            prodMap.put(KEY_INGREDIENTES, receitaList);
-            prodMap.put("receitaTexto", String.join(", ", receitaNomes));
+            Map<String, Object> prodMap = montarProdutoResponse(p, todasReceitas);
             resposta.add(prodMap);
         }
 
         return ResponseEntity.ok(resposta);
+    }
+
+    private Map<String, Object> montarProdutoResponse(Produto p, List<ItemReceita> todasReceitas) {
+        Map<String, Object> prodMap = new HashMap<>();
+        prodMap.put("id", p.getId());
+        prodMap.put(KEY_NOME, p.getNome());
+        prodMap.put(KEY_PRECO, p.getPreco());
+
+        List<Map<String, Object>> receitaList = new ArrayList<>();
+        List<String> receitaNomes = new ArrayList<>();
+        for (ItemReceita item : todasReceitas) {
+            if (item.getProduto() != null && item.getProduto().getId() != null && item.getProduto().getId().equals(p.getId())) {
+                Map<String, Object> itemMap = montarItemReceitaMap(item);
+                receitaList.add(itemMap);
+                if (item.getIngrediente() != null) {
+                    receitaNomes.add(item.getQuantidadeNecessaria() + " " + item.getIngrediente().getUnidadeMedida() + " de " + item.getIngrediente().getNome());
+                }
+            }
+        }
+        prodMap.put(KEY_RECEITA, receitaList);
+        prodMap.put(KEY_ITENS_RECEITA, receitaList);
+        prodMap.put(KEY_INGREDIENTES, receitaList);
+        prodMap.put("receitaTexto", String.join(", ", receitaNomes));
+        return prodMap;
     }
 
     private Map<String, Object> montarItemReceitaMap(ItemReceita item) {
@@ -142,18 +147,13 @@ public class ProdutoController {
 
         Produto produtoSalvo = produtoRepository.save(produto);
 
-        List<Ingrediente> todosIngredientes = ingredienteRepository.findByUsuarioId(usuario.getId());
+        List<Ingrediente> todosIngredientes = ingredienteRepository.findAll();
         List<?> itensList = extrairListaDeReceita(body);
-        List<Map<String, Object>> receitaSalvaList = processarItensReceita(itensList, produtoSalvo, todosIngredientes);
+        processarItensReceita(itensList, produtoSalvo, todosIngredientes);
 
-        Map<String, Object> responseMap = new HashMap<>();
-        responseMap.put("id", produtoSalvo.getId());
-        responseMap.put(KEY_NOME, produtoSalvo.getNome());
-        responseMap.put(KEY_PRECO, produtoSalvo.getPreco());
+        List<ItemReceita> todasReceitas = itemReceitaRepository.findAll();
+        Map<String, Object> responseMap = montarProdutoResponse(produtoSalvo, todasReceitas);
         responseMap.put(KEY_MENSAGEM, "Lanche cadastrado com sucesso!");
-        responseMap.put(KEY_RECEITA, receitaSalvaList);
-        responseMap.put(KEY_ITENS_RECEITA, receitaSalvaList);
-        responseMap.put(KEY_INGREDIENTES, receitaSalvaList);
 
         return ResponseEntity.ok(responseMap);
     }
@@ -180,8 +180,7 @@ public class ProdutoController {
         return new ArrayList<>();
     }
 
-    private List<Map<String, Object>> processarItensReceita(List<?> itensList, Produto produtoSalvo, List<Ingrediente> todosIngredientes) {
-        List<Map<String, Object>> salvos = new ArrayList<>();
+    private void processarItensReceita(List<?> itensList, Produto produtoSalvo, List<Ingrediente> todosIngredientes) {
         for (Object itemObj : itensList) {
             Ingrediente ing = buscarIngrediente(itemObj, todosIngredientes);
             Double qtd = extrairQuantidade(itemObj);
@@ -191,11 +190,9 @@ public class ProdutoController {
                 itemReceita.setProduto(produtoSalvo);
                 itemReceita.setIngrediente(ing);
                 itemReceita.setQuantidadeNecessaria(qtd);
-                ItemReceita salvo = itemReceitaRepository.save(itemReceita);
-                salvos.add(montarItemReceitaMap(salvo));
+                itemReceitaRepository.save(itemReceita);
             }
         }
-        return salvos;
     }
 
     private Ingrediente buscarIngrediente(Object itemObj, List<Ingrediente> todosIngredientes) {
@@ -229,7 +226,6 @@ public class ProdutoController {
 
         String busca = termoBusca.trim();
 
-        // 1. Tenta buscar por ID numérico
         try {
             Long id = Long.valueOf(busca);
             for (Ingrediente ing : todosIngredientes) {
@@ -238,17 +234,15 @@ public class ProdutoController {
                 }
             }
         } catch (NumberFormatException e) {
-            // Se não for número, segue para busca por nome
+            // ignora se nao for numero
         }
 
-        // 2. Tenta buscar por nome exato (ignorando maiúsculas/minúsculas)
         for (Ingrediente ing : todosIngredientes) {
             if (ing.getNome() != null && ing.getNome().equalsIgnoreCase(busca)) {
                 return ing;
             }
         }
 
-        // 3. Tenta buscar por nome parcial
         for (Ingrediente ing : todosIngredientes) {
             if (ing.getNome() != null && (ing.getNome().toLowerCase().contains(busca.toLowerCase()) || busca.toLowerCase().contains(ing.getNome().toLowerCase()))) {
                 return ing;
