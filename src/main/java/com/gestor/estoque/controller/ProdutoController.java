@@ -72,8 +72,7 @@ public class ProdutoController {
             List<Map<String, Object>> receitaList = new ArrayList<>();
             for (ItemReceita item : todasReceitas) {
                 if (item.getProduto() != null && item.getProduto().getId().equals(p.getId())) {
-                    Map<String, Object> itemMap = montarItemReceitaMap(item);
-                    receitaList.add(itemMap);
+                    receitaList.add(montarItemReceitaMap(item));
                 }
             }
             prodMap.put("receita", receitaList);
@@ -100,7 +99,7 @@ public class ProdutoController {
             ingMap.put("unidadeMedida", ing.getUnidadeMedida());
 
             itemMap.put("ingrediente", ingMap);
-            itemMap.put("nome", ing.getNome());
+            itemMap.put(KEY_NOME, ing.getNome());
             itemMap.put("ingredienteNome", ing.getNome());
             itemMap.put("unidadeMedida", ing.getUnidadeMedida());
             itemMap.put("ingredienteId", ing.getId());
@@ -135,7 +134,7 @@ public class ProdutoController {
     }
 
     private List<?> extrairListaDeReceita(Map<String, Object> body) {
-        String[] chaves = {"itensReceita", "receita", "ingredientes", "itens", "listaIngredientes", "ingredientesLanche"};
+        String[] chaves = {"itensReceita", "receita", "ingredientes", "itens", "listaIngredientes", "ingredientesLanche", "itens_receita"};
         for (String chave : chaves) {
             Object val = body.get(chave);
             if (val instanceof List<?> list && !list.isEmpty()) {
@@ -174,21 +173,18 @@ public class ProdutoController {
     }
 
     private Long extrairIngredienteId(Map<?, ?> itemMap) {
-        String[] chavesId = {"ingredienteId", "ingrediente_id", "idIngrediente", "id"};
+        String[] chavesId = {"ingredienteId", "ingrediente_id", "idIngrediente", "ingrediente", "id"};
         for (String chave : chavesId) {
             if (itemMap.containsKey(chave) && itemMap.get(chave) != null) {
-                try {
-                    return Long.valueOf(itemMap.get(chave).toString());
-                } catch (NumberFormatException e) {
-                    // ignora e tenta proxima chave
+                Object val = itemMap.get(chave);
+                if (val instanceof Map<?, ?> subMap && subMap.containsKey("id")) {
+                    val = subMap.get("id");
                 }
-            }
-        }
-        if (itemMap.containsKey("ingrediente") && itemMap.get("ingrediente") instanceof Map<?, ?> ingSubMap && ingSubMap.containsKey("id")) {
-            try {
-                return Long.valueOf(ingSubMap.get("id").toString());
-            } catch (NumberFormatException e) {
-                // ignora
+                try {
+                    return Long.valueOf(val.toString());
+                } catch (NumberFormatException e) {
+                    // ignora e tenta a próxima chave
+                }
             }
         }
         return null;
@@ -211,23 +207,27 @@ public class ProdutoController {
     @DeleteMapping("/{id}")
     @Transactional
     public ResponseEntity<Map<String, String>> excluir(@PathVariable Long id, Authentication authentication) {
-        Usuario usuario = usuarioRepository.findByEmail(authentication.getName())
-                .orElseThrow(() -> new IllegalArgumentException(ERRO_USUARIO_NAO_ENCONTRADO));
+        try {
+            Usuario usuario = usuarioRepository.findByEmail(authentication.getName())
+                    .orElseThrow(() -> new IllegalArgumentException(ERRO_USUARIO_NAO_ENCONTRADO));
 
-        Optional<Produto> prodOpt = produtoRepository.findById(id);
-        if (prodOpt.isEmpty() || !prodOpt.get().getUsuario().getId().equals(usuario.getId())) {
-            return ResponseEntity.badRequest().body(Map.of(KEY_ERRO, ERRO_PRODUTO_NAO_ENCONTRADO));
-        }
-
-        Produto produto = prodOpt.get();
-        List<ItemReceita> todasReceitas = itemReceitaRepository.findAll();
-        for (ItemReceita item : todasReceitas) {
-            if (item.getProduto() != null && item.getProduto().getId().equals(produto.getId())) {
-                itemReceitaRepository.delete(item);
+            Optional<Produto> prodOpt = produtoRepository.findById(id);
+            if (prodOpt.isEmpty() || !prodOpt.get().getUsuario().getId().equals(usuario.getId())) {
+                return ResponseEntity.badRequest().body(Map.of(KEY_ERRO, ERRO_PRODUTO_NAO_ENCONTRADO));
             }
-        }
 
-        produtoRepository.delete(produto);
-        return ResponseEntity.ok(Map.of(KEY_MENSAGEM, "Lanche excluído com sucesso!"));
+            Produto produto = prodOpt.get();
+            List<ItemReceita> todasReceitas = itemReceitaRepository.findAll();
+            for (ItemReceita item : todasReceitas) {
+                if (item.getProduto() != null && item.getProduto().getId().equals(produto.getId())) {
+                    itemReceitaRepository.delete(item);
+                }
+            }
+
+            produtoRepository.delete(produto);
+            return ResponseEntity.ok(Map.of(KEY_MENSAGEM, "Lanche excluído com sucesso!"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(KEY_ERRO, "Erro ao excluir lanche: " + e.getMessage()));
+        }
     }
 }
