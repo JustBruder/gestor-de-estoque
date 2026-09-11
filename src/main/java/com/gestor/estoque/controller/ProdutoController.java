@@ -35,8 +35,8 @@ public class ProdutoController {
     private static final String ERRO_PRODUTO_NAO_ENCONTRADO = "Produto não encontrado.";
     private static final String KEY_ERRO = "erro";
     private static final String KEY_MENSAGEM = "mensagem";
-    private static final String KEY_INGREDIENTE_ID = "ingredienteId";
-    private static final String KEY_QTD_NECESSARIA = "quantidadeNecessaria";
+    private static final String KEY_NOME = "nome";
+    private static final String KEY_PRECO = "preco";
 
     private final ProdutoRepository produtoRepository;
     private final IngredienteRepository ingredienteRepository;
@@ -66,26 +66,30 @@ public class ProdutoController {
         for (Produto p : produtos) {
             Map<String, Object> prodMap = new HashMap<>();
             prodMap.put("id", p.getId());
-            prodMap.put("nome", p.getNome());
-            prodMap.put("preco", p.getPreco());
+            prodMap.put(KEY_NOME, p.getNome());
+            prodMap.put(KEY_PRECO, p.getPreco());
 
             List<Map<String, Object>> receitaList = new ArrayList<>();
             for (ItemReceita item : todasReceitas) {
                 if (item.getProduto() != null && item.getProduto().getId().equals(p.getId())) {
                     Map<String, Object> itemMap = new HashMap<>();
                     itemMap.put("id", item.getId());
-                    itemMap.put(KEY_QTD_NECESSARIA, item.getQuantidadeNecessaria());
+                    itemMap.put("quantidadeNecessaria", item.getQuantidadeNecessaria());
+                    itemMap.put("quantidade", item.getQuantidadeNecessaria());
                     if (item.getIngrediente() != null) {
                         Map<String, Object> ingMap = new HashMap<>();
                         ingMap.put("id", item.getIngrediente().getId());
-                        ingMap.put("nome", item.getIngrediente().getNome());
+                        ingMap.put(KEY_NOME, item.getIngrediente().getNome());
                         ingMap.put("unidadeMedida", item.getIngrediente().getUnidadeMedida());
                         itemMap.put("ingrediente", ingMap);
+                        itemMap.put("ingredienteNome", item.getIngrediente().getNome());
+                        itemMap.put("ingredienteId", item.getIngrediente().getId());
                     }
                     receitaList.add(itemMap);
                 }
             }
             prodMap.put("receita", receitaList);
+            prodMap.put("itensReceita", receitaList);
             resposta.add(prodMap);
         }
 
@@ -98,12 +102,12 @@ public class ProdutoController {
         Usuario usuario = usuarioRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new IllegalArgumentException(ERRO_USUARIO_NAO_ENCONTRADO));
 
-        if (!body.containsKey("nome") || !body.containsKey("preco")) {
+        if (!body.containsKey(KEY_NOME) || !body.containsKey(KEY_PRECO)) {
             return ResponseEntity.badRequest().body(Map.of(KEY_ERRO, "Nome e preço são obrigatórios."));
         }
 
-        String nome = body.get("nome").toString().trim();
-        Double preco = Double.valueOf(body.get("preco").toString());
+        String nome = body.get(KEY_NOME).toString().trim();
+        Double preco = Double.valueOf(body.get(KEY_PRECO).toString());
 
         Produto produto = new Produto();
         produto.setNome(nome);
@@ -113,8 +117,11 @@ public class ProdutoController {
         Produto produtoSalvo = produtoRepository.save(produto);
 
         Object itensObj = body.get("itensReceita");
-        if (itensObj instanceof List<?>) {
-            List<?> itensList = (List<?>) itensObj;
+        if (itensObj == null) {
+            itensObj = body.get("receita");
+        }
+
+        if (itensObj instanceof List<?> itensList) {
             processarItensReceita(itensList, produtoSalvo);
         }
 
@@ -124,13 +131,10 @@ public class ProdutoController {
     private void processarItensReceita(List<?> itensList, Produto produtoSalvo) {
         for (Object itemObj : itensList) {
             if (itemObj instanceof Map<?, ?> itemMap) {
-                Object ingIdObj = itemMap.get(KEY_INGREDIENTE_ID);
-                Object qtdObj = itemMap.get(KEY_QTD_NECESSARIA);
+                Long ingId = extrairIngredienteId(itemMap);
+                Double qtd = extrairQuantidade(itemMap);
 
-                if (ingIdObj != null && qtdObj != null) {
-                    Long ingId = Long.valueOf(ingIdObj.toString());
-                    Double qtd = Double.valueOf(qtdObj.toString());
-
+                if (ingId != null && qtd != null) {
                     Optional<Ingrediente> ingOpt = ingredienteRepository.findById(ingId);
                     if (ingOpt.isPresent()) {
                         ItemReceita itemReceita = new ItemReceita();
@@ -142,6 +146,35 @@ public class ProdutoController {
                 }
             }
         }
+    }
+
+    private Long extrairIngredienteId(Map<?, ?> itemMap) {
+        if (itemMap.containsKey("ingredienteId")) {
+            return Long.valueOf(itemMap.get("ingredienteId").toString());
+        }
+        if (itemMap.containsKey("ingrediente_id")) {
+            return Long.valueOf(itemMap.get("ingrediente_id").toString());
+        }
+        if (itemMap.containsKey("ingrediente") && itemMap.get("ingrediente") instanceof Map<?, ?> ingSubMap && ingSubMap.containsKey("id")) {
+            return Long.valueOf(ingSubMap.get("id").toString());
+        }
+        if (itemMap.containsKey("id")) {
+            return Long.valueOf(itemMap.get("id").toString());
+        }
+        return null;
+    }
+
+    private Double extrairQuantidade(Map<?, ?> itemMap) {
+        if (itemMap.containsKey("quantidadeNecessaria")) {
+            return Double.valueOf(itemMap.get("quantidadeNecessaria").toString());
+        }
+        if (itemMap.containsKey("quantidade")) {
+            return Double.valueOf(itemMap.get("quantidade").toString());
+        }
+        if (itemMap.containsKey("qtd")) {
+            return Double.valueOf(itemMap.get("qtd").toString());
+        }
+        return null;
     }
 
     @DeleteMapping("/{id}")
