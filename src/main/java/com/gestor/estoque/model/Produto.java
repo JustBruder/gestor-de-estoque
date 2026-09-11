@@ -2,6 +2,7 @@ package com.gestor.estoque.model;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -27,8 +28,7 @@ public class Produto {
     @JoinColumn(name = "usuario_id")
     private Usuario usuario;
 
-    // A MÁGICA ACONTECE AQUI
-    @OneToMany(mappedBy = "produto", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "produto", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<ItemReceita> receita = new ArrayList<>();
 
     public Long getId() { return id; }
