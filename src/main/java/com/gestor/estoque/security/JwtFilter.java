@@ -37,20 +37,17 @@ public class JwtFilter extends OncePerRequestFilter {
             String token = authHeader.substring(7);
 
             try {
-                // Tenta extrair o email. Se no seu JwtUtil o nome for 'extractEmail', basta trocar a palavra abaixo.
-                String email = jwtUtil.extractUsername(token);
+                // AGORA SIM: Usando o nome exato do seu JwtUtil
+                String email = jwtUtil.getEmailFromToken(token);
 
                 if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                     Usuario usuario = usuarioRepository.findByEmail(email).orElse(null);
 
                     if (usuario != null) {
-                        // RESOLVE O ERRO 2: Cria o UserDetails do jeito certo em vez de forçar a conversão.
-                        // (Usei "" na senha para evitar erro caso sua entidade use outro nome de variável, o Spring não precisa dela aqui)
                         UserDetails userDetails = new User(usuario.getEmail(), "", new ArrayList<>());
 
-                        // RESOLVE O ERRO 1: Passa o token e o userDetails juntos.
-                        // ATENÇÃO: Se o seu método lá no JwtUtil se chamar 'isTokenValid', troque a palavra abaixo.
-                        if (jwtUtil.validateToken(token, userDetails)) {
+                        // AGORA SIM: Usando o método tokenValido do seu JwtUtil
+                        if (jwtUtil.tokenValido(token)) {
                             UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                                     email, null, userDetails.getAuthorities()
                             );
