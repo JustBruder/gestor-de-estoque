@@ -15,6 +15,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -39,11 +41,43 @@ public class ProdutoController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Produto>> listar(Authentication authentication) {
+    public ResponseEntity<List<Map<String, Object>>> listar(Authentication authentication) {
         Usuario usuario = usuarioRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado."));
-        
-        return ResponseEntity.ok(produtoRepository.findByUsuarioId(usuario.getId()));
+
+        // 1. Busca todos os lanches e TODAS as receitas na força bruta
+        List<Produto> produtos = produtoRepository.findByUsuarioId(usuario.getId());
+        List<ItemReceita> todasReceitas = itemReceitaRepository.findAll();
+
+        List<Map<String, Object>> resposta = new ArrayList<>();
+
+        // 2. Monta o JSON perfeitamente formatado na mão para o app.js
+        for (Produto p : produtos) {
+            Map<String, Object> lanche = new HashMap<>();
+            lanche.put("id", p.getId());
+            lanche.put("nome", p.getNome());
+            lanche.put("preco", p.getPreco());
+
+            List<Map<String, Object>> receitaDoLanche = new ArrayList<>();
+
+            for (ItemReceita item : todasReceitas) {
+                if (item.getProduto() != null && item.getProduto().getId().equals(p.getId())) {
+                    Map<String, Object> ingDetalhes = new HashMap<>();
+                    ingDetalhes.put("nome", item.getIngrediente().getNome());
+
+                    Map<String, Object> itemMap = new HashMap<>();
+                    itemMap.put("quantidadeNecessaria", item.getQuantidadeNecessaria());
+                    itemMap.put("ingrediente", ingDetalhes);
+
+                    receitaDoLanche.add(itemMap);
+                }
+            }
+
+            lanche.put("receita", receitaDoLanche);
+            resposta.add(lanche);
+        }
+
+        return ResponseEntity.ok(resposta);
     }
 
     @PostMapping
@@ -52,16 +86,15 @@ public class ProdutoController {
         Usuario usuario = usuarioRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado."));
 
+        // 1. Salva o lanche para garantir que ele existe
         Produto produto = new Produto();
         produto.setNome(dto.getNome());
         produto.setPreco(dto.getPreco());
         produto.setUsuario(usuario);
-
-        // PASSO 1: Força bruta. Salva o lanche primeiro pra ele existir de fato no banco.
         Produto produtoSalvo = produtoRepository.save(produto);
 
-        // PASSO 2: Se tem ingredientes, vamos atrelar um por um.
-        if (dto.getItensReceita() != null && !dto.getItensReceita().isEmpty()) {
+        // 2. Salva cada item da receita individualmente 
+        if (dto.getItensReceita() != null) {
             for (ItemReceitaDTO itemDto : dto.getItensReceita()) {
                 Ingrediente ing = ingredienteRepository.findById(itemDto.getIngredienteId())
                         .orElseThrow(() -> new IllegalArgumentException("Ingrediente não encontrado"));
@@ -69,15 +102,12 @@ public class ProdutoController {
                 ItemReceita itemReceita = new ItemReceita();
                 itemReceita.setIngrediente(ing);
                 itemReceita.setQuantidadeNecessaria(itemDto.getQuantidadeNecessaria());
-                
-                // Atrela ao lanche recém-salvo
-                itemReceita.setProduto(produtoSalvo); 
-                
-                // PASSO 3: Salva a receita na marra. Chega de depender de mágica.
+                itemReceita.setProduto(produtoSalvo);
+
                 itemReceitaRepository.save(itemReceita);
             }
         }
-        
+
         return ResponseEntity.ok(Map.of("mensagem", "Lanche cadastrado com sucesso!"));
     }
 
@@ -92,6 +122,15 @@ public class ProdutoController {
             return ResponseEntity.badRequest().body(Map.of("erro", "Produto não encontrado."));
         }
 
+        // Apaga as receitas vinculadas primeiro na marra para não dar erro
+        List<ItemReceita> todasReceitas = itemReceitaRepository.findAll();
+        for (ItemReceita item : todasReceitas) {
+            if (item.getProduto() != null && item.getProduto().getId().equals(id)) {
+                itemReceitaRepository.delete(item);
+            }
+        }
+
+        // Depois apaga o lanche
         produtoRepository.deleteById(id);
         return ResponseEntity.ok(Map.of("mensagem", "Lanche excluído com sucesso!"));
     }
