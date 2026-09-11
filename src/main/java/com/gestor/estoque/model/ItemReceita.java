@@ -1,7 +1,12 @@
 package com.gestor.estoque.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import jakarta.persistence.*;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "itens_receita")
@@ -13,34 +18,46 @@ public class ItemReceita {
 
     @ManyToOne
     @JoinColumn(name = "produto_id")
-    @JsonIgnore
     private Produto produto;
 
     @ManyToOne
     @JoinColumn(name = "ingrediente_id")
     private Ingrediente ingrediente;
 
-    @Column(nullable = false)
     private Double quantidadeNecessaria;
 
-    public ItemReceita() {}
-
-    public ItemReceita(Long id, Produto produto, Ingrediente ingrediente, Double quantidadeNecessaria) {
-        this.id = id;
-        this.produto = produto;
-        this.ingrediente = ingrediente;
-        this.quantidadeNecessaria = quantidadeNecessaria;
+    public ItemReceita() {
     }
 
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
+    public Long getId() {
+        return id;
+    }
 
-    public Produto getProduto() { return produto; }
-    public void setProduto(Produto produto) { this.produto = produto; }
+    public void setId(Long id) {
+        this.id = id;
+    }
 
-    public Ingrediente getIngrediente() { return ingrediente; }
-    public void setIngrediente(Ingrediente ingrediente) { this.ingrediente = ingrediente; }
+    public Produto getProduto() {
+        return produto;
+    }
 
-    public Double getQuantidadeNecessaria() { return quantidadeNecessaria; }
-    public void setQuantidadeNecessaria(Double quantidadeNecessaria) { this.quantidadeNecessaria = quantidadeNecessaria; }
+    public void setProduto(Produto produto) {
+        this.produto = produto;
+    }
+
+    public Ingrediente getIngrediente() {
+        return ingrediente;
+    }
+
+    public void setIngrediente(Ingrediente ingrediente) {
+        this.ingrediente = ingrediente;
+    }
+
+    public Double getQuantidadeNecessaria() {
+        return quantidadeNecessaria;
+    }
+
+    public void setQuantidadeNecessaria(Double quantidadeNecessaria) {
+        this.quantidadeNecessaria = quantidadeNecessaria;
+    }
 }
