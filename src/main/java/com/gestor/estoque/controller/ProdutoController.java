@@ -1,5 +1,7 @@
 package com.gestor.estoque.controller;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gestor.estoque.model.Ingrediente;
 import com.gestor.estoque.model.ItemReceita;
 import com.gestor.estoque.model.Produto;
@@ -43,6 +45,7 @@ public class ProdutoController {
     private final IngredienteRepository ingredienteRepository;
     private final ItemReceitaRepository itemReceitaRepository;
     private final UsuarioRepository usuarioRepository;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public ProdutoController(ProdutoRepository produtoRepository,
                              IngredienteRepository ingredienteRepository,
@@ -71,14 +74,20 @@ public class ProdutoController {
             prodMap.put(KEY_PRECO, p.getPreco());
 
             List<Map<String, Object>> receitaList = new ArrayList<>();
+            List<String> receitaNomes = new ArrayList<>();
             for (ItemReceita item : todasReceitas) {
                 if (item.getProduto() != null && item.getProduto().getId() != null && item.getProduto().getId().equals(p.getId())) {
-                    receitaList.add(montarItemReceitaMap(item));
+                    Map<String, Object> itemMap = montarItemReceitaMap(item);
+                    receitaList.add(itemMap);
+                    if (item.getIngrediente() != null) {
+                        receitaNomes.add(item.getQuantidadeNecessaria() + "x " + item.getIngrediente().getNome());
+                    }
                 }
             }
             prodMap.put("receita", receitaList);
             prodMap.put("itensReceita", receitaList);
             prodMap.put("ingredientes", receitaList);
+            prodMap.put("receitaTexto", String.join(", ", receitaNomes));
             resposta.add(prodMap);
         }
 
@@ -138,8 +147,19 @@ public class ProdutoController {
         String[] chaves = {"itensReceita", "receita", "ingredientes", "itens", "listaIngredientes", "ingredientesLanche", "itens_receita"};
         for (String chave : chaves) {
             Object val = body.get(chave);
-            if (val instanceof List<?> list && !list.isEmpty()) {
-                return list;
+            if (val != null) {
+                if (val instanceof List<?> list && !list.isEmpty()) {
+                    return list;
+                } else if (val instanceof String strVal && !strVal.trim().isEmpty()) {
+                    try {
+                        return objectMapper.readValue(strVal, new TypeReference<List<Object>>() {});
+                    } catch (Exception e) {
+                        List<String> listFromCsv = List.of(strVal.split(","));
+                        if (!listFromCsv.isEmpty()) {
+                            return listFromCsv;
+                        }
+                    }
+                }
             }
         }
         return new ArrayList<>();
@@ -158,6 +178,12 @@ public class ProdutoController {
                 }
             } else if (itemObj instanceof Number num) {
                 ingId = num.longValue();
+            } else if (itemObj instanceof String str && !str.trim().isEmpty()) {
+                try {
+                    ingId = Long.valueOf(str.trim());
+                } catch (NumberFormatException e) {
+                    // ignora
+                }
             }
 
             if (ingId != null) {
