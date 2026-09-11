@@ -1,7 +1,7 @@
 // ==========================================
 // CONFIGURAÇÃO GLOBAL DA API (CLEVER CLOUD)
 // ==========================================
-const API_URL = "https://app-443b811a-ae97-40b5-90ae-dbdcac27e57c.cleverapps.io/api";
+const API_URL = "https://app-58f13233-93ab-41e4-8cfa-d7aa4e33885f.cleverapps.io/api";
 
 document.addEventListener("DOMContentLoaded", () => {
     // Carrega os dados iniciais se houver token salvo
@@ -150,7 +150,6 @@ async function excluirIngrediente(id) {
 function adicionarLinhaIngrediente() {
     let container = document.getElementById("containerIngredientesLanche");
     if (!container) {
-        // Se a div não existir no HTML, cria automaticamente antes do botão
         const btnCadastrar = document.querySelector('[onclick*="cadastrarLanche"]') || document.querySelector('button[type="submit"]');
         if (btnCadastrar && btnCadastrar.parentElement) {
             container = document.createElement("div");
