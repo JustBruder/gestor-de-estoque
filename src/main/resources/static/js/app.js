@@ -404,12 +404,25 @@ async function carregarEstoque() {
         const resIng = await fetch(`${API_BASE}/api/ingredientes`, { headers: getHeaders() });
         const ingredientes = await parseRes(resIng);
         const tbodyIng = document.getElementById("tabelaEstoque");
+        const tbodyBaixo = document.getElementById("tabelaEstoqueBaixo");
+        const painelBaixo = document.getElementById("painelEstoqueBaixoContainer");
+
+        let itensBaixos = [];
+
         if (tbodyIng && Array.isArray(ingredientes)) {
             tbodyIng.innerHTML = "";
             if (ingredientes.length === 0) {
                 tbodyIng.innerHTML = `<tr><td colspan="5" class="text-center text-muted">Nenhum ingrediente.</td></tr>`;
             } else {
                 ingredientes.forEach(item => {
+                    // Regra de Estoque Baixo: <= 20 para UN/FATIA, <= 200 para GRAMAS/ML/KG
+                    const unidade = (item.unidadeMedida || "").toUpperCase();
+                    const limite = (unidade.includes("GRAMA") || unidade.includes("ML") || unidade.includes("KG")) ? 200 : 20;
+
+                    if (item.quantidadeEstoque <= limite) {
+                        itensBaixos.push(item);
+                    }
+
                     tbodyIng.innerHTML += `
                         <tr>
                             <td>${item.id}</td>
@@ -422,6 +435,26 @@ async function carregarEstoque() {
                         </tr>
                     `;
                 });
+            }
+
+            // Renderiza o Alerta de Estoque Baixo Automaticamente
+            if (tbodyBaixo && painelBaixo) {
+                tbodyBaixo.innerHTML = "";
+                if (itensBaixos.length > 0) {
+                    painelBaixo.style.display = "block";
+                    itensBaixos.forEach(item => {
+                        tbodyBaixo.innerHTML += `
+                            <tr>
+                                <td>${item.id}</td>
+                                <td class="fw-bold text-danger">${item.nome}</td>
+                                <td class="fw-bold text-warning">${item.quantidadeEstoque}</td>
+                                <td>${item.unidadeMedida}</td>
+                            </tr>
+                        `;
+                    });
+                } else {
+                    painelBaixo.style.display = "none";
+                }
             }
         }
 
