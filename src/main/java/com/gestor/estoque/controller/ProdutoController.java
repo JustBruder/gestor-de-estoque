@@ -8,6 +8,7 @@ import com.gestor.estoque.repository.IngredienteRepository;
 import com.gestor.estoque.repository.ItemReceitaRepository;
 import com.gestor.estoque.repository.ProdutoRepository;
 import com.gestor.estoque.repository.UsuarioRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
@@ -71,7 +72,7 @@ public class ProdutoController {
 
             List<Map<String, Object>> receitaList = new ArrayList<>();
             for (ItemReceita item : todasReceitas) {
-                if (item.getProduto() != null && item.getProduto().getId().equals(p.getId())) {
+                if (item.getProduto() != null && item.getProduto().getId() != null && item.getProduto().getId().equals(p.getId())) {
                     receitaList.add(montarItemReceitaMap(item));
                 }
             }
@@ -183,7 +184,7 @@ public class ProdutoController {
                 try {
                     return Long.valueOf(val.toString());
                 } catch (NumberFormatException e) {
-                    // ignora e tenta a próxima chave
+                    // ignora
                 }
             }
         }
@@ -219,15 +220,17 @@ public class ProdutoController {
             Produto produto = prodOpt.get();
             List<ItemReceita> todasReceitas = itemReceitaRepository.findAll();
             for (ItemReceita item : todasReceitas) {
-                if (item.getProduto() != null && item.getProduto().getId().equals(produto.getId())) {
+                if (item.getProduto() != null && item.getProduto().getId() != null && item.getProduto().getId().equals(produto.getId())) {
                     itemReceitaRepository.delete(item);
                 }
             }
 
             produtoRepository.delete(produto);
             return ResponseEntity.ok(Map.of(KEY_MENSAGEM, "Lanche excluído com sucesso!"));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of(KEY_ERRO, "Erro ao excluir lanche: " + e.getMessage()));
+        } catch (DataIntegrityViolationException e) {
+            return ResponseEntity.badRequest().body(Map.of(KEY_ERRO, "Erro de integridade ao excluir lanche."));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of(KEY_ERRO, e.getMessage()));
         }
     }
 }
