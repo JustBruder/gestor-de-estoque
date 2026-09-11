@@ -35,6 +35,8 @@ public class ProdutoController {
     private static final String ERRO_PRODUTO_NAO_ENCONTRADO = "Produto não encontrado.";
     private static final String KEY_ERRO = "erro";
     private static final String KEY_MENSAGEM = "mensagem";
+    private static final String KEY_INGREDIENTE_ID = "ingredienteId";
+    private static final String KEY_QTD_NECESSARIA = "quantidadeNecessaria";
 
     private final ProdutoRepository produtoRepository;
     private final IngredienteRepository ingredienteRepository;
@@ -72,7 +74,7 @@ public class ProdutoController {
                 if (item.getProduto() != null && item.getProduto().getId().equals(p.getId())) {
                     Map<String, Object> itemMap = new HashMap<>();
                     itemMap.put("id", item.getId());
-                    itemMap.put("quantidadeNecessaria", item.getQuantidadeNecessaria());
+                    itemMap.put(KEY_QTD_NECESSARIA, item.getQuantidadeNecessaria());
                     if (item.getIngrediente() != null) {
                         Map<String, Object> ingMap = new HashMap<>();
                         ingMap.put("id", item.getIngrediente().getId());
@@ -92,7 +94,7 @@ public class ProdutoController {
 
     @PostMapping
     @Transactional
-    public ResponseEntity<Object> criar(@RequestBody Map<String, Object> body, Authentication authentication) {
+    public ResponseEntity<Map<String, String>> criar(@RequestBody Map<String, Object> body, Authentication authentication) {
         Usuario usuario = usuarioRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new IllegalArgumentException(ERRO_USUARIO_NAO_ENCONTRADO));
 
@@ -110,35 +112,41 @@ public class ProdutoController {
 
         Produto produtoSalvo = produtoRepository.save(produto);
 
-        if (body.containsKey("itensReceita") && body.get("itensReceita") instanceof List) {
-            List<?> itensRaw = (List<?>) body.get("itensReceita");
-
-            for (Object itemObj : itensRaw) {
-                if (itemObj instanceof Map) {
-                    Map<?, ?> itemMap = (Map<?, ?>) itemObj;
-                    if (itemMap.containsKey("ingredienteId") && itemMap.containsKey("quantidadeNecessaria")) {
-                        Long ingId = Long.valueOf(itemMap.get("ingredienteId").toString());
-                        Double qtd = Double.valueOf(itemMap.get("quantidadeNecessaria").toString());
-
-                        Optional<Ingrediente> ingOpt = ingredienteRepository.findById(ingId);
-                        if (ingOpt.isPresent()) {
-                            ItemReceita itemReceita = new ItemReceita();
-                            itemReceita.setProduto(produtoSalvo);
-                            itemReceita.setIngrediente(ingOpt.get());
-                            itemReceita.setQuantidadeNecessaria(qtd);
-                            itemReceitaRepository.save(itemReceita);
-                        }
-                    }
-                }
-            }
+        Object itensObj = body.get("itensReceita");
+        if (itensObj instanceof List<?>) {
+            List<?> itensList = (List<?>) itensObj;
+            processarItensReceita(itensList, produtoSalvo);
         }
 
         return ResponseEntity.ok(Map.of(KEY_MENSAGEM, "Lanche cadastrado com sucesso!"));
     }
 
+    private void processarItensReceita(List<?> itensList, Produto produtoSalvo) {
+        for (Object itemObj : itensList) {
+            if (itemObj instanceof Map<?, ?> itemMap) {
+                Object ingIdObj = itemMap.get(KEY_INGREDIENTE_ID);
+                Object qtdObj = itemMap.get(KEY_QTD_NECESSARIA);
+
+                if (ingIdObj != null && qtdObj != null) {
+                    Long ingId = Long.valueOf(ingIdObj.toString());
+                    Double qtd = Double.valueOf(qtdObj.toString());
+
+                    Optional<Ingrediente> ingOpt = ingredienteRepository.findById(ingId);
+                    if (ingOpt.isPresent()) {
+                        ItemReceita itemReceita = new ItemReceita();
+                        itemReceita.setProduto(produtoSalvo);
+                        itemReceita.setIngrediente(ingOpt.get());
+                        itemReceita.setQuantidadeNecessaria(qtd);
+                        itemReceitaRepository.save(itemReceita);
+                    }
+                }
+            }
+        }
+    }
+
     @DeleteMapping("/{id}")
     @Transactional
-    public ResponseEntity<Object> excluir(@PathVariable Long id, Authentication authentication) {
+    public ResponseEntity<Map<String, String>> excluir(@PathVariable Long id, Authentication authentication) {
         Usuario usuario = usuarioRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new IllegalArgumentException(ERRO_USUARIO_NAO_ENCONTRADO));
 
